@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func createWebCache(t *testing.T, capacity uint64, shards int) Cache {
+func createWebCache(t *testing.T, capacity uint64, shards int) Cacher {
 	cache := NewWebCache(capacity, shards)
 	if cache == nil {
 		t.Errorf("NewWebCache() returned null")

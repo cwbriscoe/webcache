@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func createShard(t *testing.T, capacity uint64) Cache {
+func createShard(t *testing.T, capacity uint64) Cacher {
 	cache := NewShard(capacity)
 	if cache == nil {
 		t.Errorf("NewCache() returned null")

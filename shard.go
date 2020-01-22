@@ -22,8 +22,8 @@ func (v *cacheValue) size() uint64 {
 	return uint64(len(v.key) + len(v.bytes))
 }
 
-// Cache is an interface for either an ECache or WebCache
-type Cache interface {
+// Cacher is an interface for either an ECache or WebCache
+type Cacher interface {
 	Set(string, []byte) string
 	Get(string, string) ([]byte, string)
 	Delete(string)

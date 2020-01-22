@@ -1,4 +1,5 @@
 //Copyright 2020 Christopher Briscoe.  All rights reserved.
+
 package webcache
 
 import "hash/fnv"
