@@ -8,15 +8,15 @@ import (
 	"testing"
 )
 
-func createShard(t *testing.T, capacity uint64) Cacher {
-	cache := NewShard(capacity)
+func createBucket(t *testing.T, capacity uint64) Cacher {
+	cache := NewBucket(capacity)
 	if cache == nil {
 		t.Errorf("NewCache() returned null")
 	}
 	return cache
 }
 
-func (c *Shard) getWithDeferredLock(key string) []byte {
+func (c *Bucket) getWithDeferredLock(key string) []byte {
 	defer c.Unlock()
 	c.Lock()
 
@@ -28,7 +28,7 @@ func (c *Shard) getWithDeferredLock(key string) []byte {
 	return elt.Value.(*cacheValue).bytes
 }
 
-func (c *Shard) getWithNoLock(key string) []byte {
+func (c *Bucket) getWithNoLock(key string) []byte {
 	elt, ok := c.table[key]
 	if !ok {
 		return nil
@@ -37,18 +37,18 @@ func (c *Shard) getWithNoLock(key string) []byte {
 	return elt.Value.(*cacheValue).bytes
 }
 
-func (c *Shard) sizeWithDeferredLock() uint64 {
+func (c *Bucket) sizeWithDeferredLock() uint64 {
 	defer c.Unlock()
 	c.Lock()
 	return c.size
 }
 
-func (c *Shard) sizeWithNoLock() uint64 {
+func (c *Bucket) sizeWithNoLock() uint64 {
 	return c.size
 }
 
 func TestSet(t *testing.T) {
-	cache := createShard(t, 1000)
+	cache := createBucket(t, 1000)
 	key := "key"
 	val := "value"
 
@@ -65,7 +65,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	cache := createShard(t, 1000)
+	cache := createBucket(t, 1000)
 	key := "key"
 	val := "value"
 
@@ -78,7 +78,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	cache := createShard(t, 1000)
+	cache := createBucket(t, 1000)
 	key := "key"
 	val := "value"
 
@@ -91,7 +91,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-var raceCache = NewShard(1000)
+var raceCache = NewBucket(1000)
 
 func TestRace(t *testing.T) {
 	var wg sync.WaitGroup
@@ -124,7 +124,7 @@ func TestRace(t *testing.T) {
 }
 
 func BenchmarkDeferGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	v := []byte(strings.Repeat("X", 900))
 	cache.Set("key", v)
 	b.ResetTimer()
@@ -134,7 +134,7 @@ func BenchmarkDeferGet(b *testing.B) {
 }
 
 func BenchmarkDeferEmptyGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.getWithDeferredLock("missingkey")
@@ -142,7 +142,7 @@ func BenchmarkDeferEmptyGet(b *testing.B) {
 }
 
 func BenchmarkDeferSize(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.sizeWithDeferredLock()
@@ -150,7 +150,7 @@ func BenchmarkDeferSize(b *testing.B) {
 }
 
 func BenchmarkNoDeferGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	v := []byte(strings.Repeat("X", 900))
 	cache.Set("key", v)
 	b.ResetTimer()
@@ -160,7 +160,7 @@ func BenchmarkNoDeferGet(b *testing.B) {
 }
 
 func BenchmarkNoDeferEmptyGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.Get("missingkey", "")
@@ -168,7 +168,7 @@ func BenchmarkNoDeferEmptyGet(b *testing.B) {
 }
 
 func BenchmarkNoDeferSize(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.Size()
@@ -176,7 +176,7 @@ func BenchmarkNoDeferSize(b *testing.B) {
 }
 
 func BenchmarkNoLockGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	v := []byte(strings.Repeat("X", 900))
 	cache.Set("key", v)
 	b.ResetTimer()
@@ -186,7 +186,7 @@ func BenchmarkNoLockGet(b *testing.B) {
 }
 
 func BenchmarkNoLockEmptyGet(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.getWithNoLock("missingkey")
@@ -194,7 +194,7 @@ func BenchmarkNoLockEmptyGet(b *testing.B) {
 }
 
 func BenchmarkNoLockSize(b *testing.B) {
-	cache := NewShard(1000)
+	cache := NewBucket(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.sizeWithNoLock()

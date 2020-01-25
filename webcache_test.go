@@ -12,8 +12,8 @@ import (
 	"testing"
 )
 
-func createWebCache(t *testing.T, capacity uint64, shards int) Cacher {
-	cache := NewWebCache(capacity, shards)
+func createWebCache(t *testing.T, capacity uint64, buckets int) Cacher {
+	cache := NewWebCache(capacity, buckets)
 	if cache == nil {
 		t.Errorf("NewWebCache() returned null")
 	}
@@ -22,23 +22,23 @@ func createWebCache(t *testing.T, capacity uint64, shards int) Cacher {
 
 func TestWebCount(t *testing.T) {
 	cache := NewWebCache(10000, 0)
-	if cache.shards != defaultShards {
-		t.Errorf("Expected defaultShards when setting shards to 0")
+	if cache.buckets != defaultBuckets {
+		t.Errorf("Expected defaultBucket when setting buckets to 0")
 	}
 
 	cache = NewWebCache(10000, 999)
-	if cache.shards != defaultShards {
-		t.Errorf("Expected defaultShards when setting shards to > 256")
+	if cache.buckets != defaultBuckets {
+		t.Errorf("Expected defaultBucket when setting buckets to > 256")
 	}
 
 	cache = NewWebCache(10000, 1)
-	if cache.shards != 1 {
-		t.Errorf("Expected shards to be 1 when setting shards to 1")
+	if cache.buckets != 1 {
+		t.Errorf("Expected buckets to be 1 when setting buckets to 1")
 	}
 
 	cache = NewWebCache(10000, 2)
-	if cache.shards != 2 {
-		t.Errorf("Expected shards to be 2 when setting shards to 2")
+	if cache.buckets != 2 {
+		t.Errorf("Expected buckets to be 2 when setting buckets to 2")
 	}
 }
 
@@ -108,13 +108,13 @@ func TestShardedRace(t *testing.T) {
 }
 
 func (c *WebCache) getShardSha1(key string) int {
-	return int(sha1.Sum([]byte(key))[0]) % c.shards
+	return int(sha1.Sum([]byte(key))[0]) % c.buckets
 }
 
 func (c *WebCache) getShardTest(key string) uint64 {
 	hash := fnv.New64a()
 	hash.Write([]byte(key))
-	return hash.Sum64() % uint64(c.shards)
+	return hash.Sum64() % uint64(c.buckets)
 }
 
 func BenchmarkHashMd5(b *testing.B) {
@@ -177,7 +177,7 @@ func benchmarkRealSharded(b *testing.B, ratio int) {
 }
 
 func benchmarkRealNotSharded(b *testing.B, ratio int) {
-	cache := NewShard(200000)
+	cache := NewBucket(200000)
 	b.ResetTimer()
 
 	b.SetParallelism(16)

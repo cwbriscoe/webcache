@@ -22,7 +22,7 @@ func (v *cacheValue) size() uint64 {
 	return uint64(len(v.key) + len(v.bytes))
 }
 
-// Cacher is an interface for either an ECache or WebCache
+// Cacher is an interface for either an Bucket or WebCache
 type Cacher interface {
 	Set(string, []byte) string
 	Get(string, string) ([]byte, string)
@@ -30,19 +30,19 @@ type Cacher interface {
 	Size() uint64
 }
 
-// Shard is a simple LRU cache with Etag support
-type Shard struct {
+// Bucket is a simple LRU cache with Etag support
+type Bucket struct {
 	sync.Mutex
 	size     uint64
 	capacity uint64
 	list     *list.List
 	table    map[string]*list.Element
-	etags		 map[string]string
+	etags    map[string]string
 }
 
-// NewShard creates a new Cache with a maximum size of capacity bytes.
-func NewShard(capacity uint64) *Shard {
-	return &Shard{
+// NewBucket creates a new Cache with a maximum size of capacity bytes.
+func NewBucket(capacity uint64) *Bucket {
+	return &Bucket{
 		capacity: capacity,
 		list:     list.New(),
 		table:    make(map[string]*list.Element),
@@ -51,7 +51,7 @@ func NewShard(capacity uint64) *Shard {
 }
 
 // Set inserts some {key, value} into the cache.
-func (c *Shard) Set(key string, value []byte) string {
+func (c *Bucket) Set(key string, value []byte) string {
 	var osz uint64
 
 	c.Lock()
@@ -85,7 +85,7 @@ func (c *Shard) Set(key string, value []byte) string {
 }
 
 // Get retrieves a value from the cache or nil if no value present.
-func (c *Shard) Get(key string, etag string) ([]byte, string) {
+func (c *Bucket) Get(key string, etag string) ([]byte, string) {
 	c.Lock()
 
 	//return if the etag matches the etag cache
@@ -98,7 +98,7 @@ func (c *Shard) Get(key string, etag string) ([]byte, string) {
 	//otherwise see if we get a cache hit
 	elt, ok := c.table[key]
 	if !ok {
-	  //no hit so return nil/"" since etag will be recalculated after the key is set
+		//no hit so return nil/"" since etag will be recalculated after the key is set
 		c.Unlock()
 		return nil, ""
 	}
@@ -113,7 +113,7 @@ func (c *Shard) Get(key string, etag string) ([]byte, string) {
 }
 
 // Delete the value indicated by the key, if it is present.
-func (c *Shard) Delete(key string) {
+func (c *Bucket) Delete(key string) {
 	c.Lock()
 
 	elt, ok := c.table[key]
@@ -138,7 +138,7 @@ func (c *Shard) Delete(key string) {
 }
 
 // Size returns an approximate size of the cache
-func (c *Shard) Size() uint64 {
+func (c *Bucket) Size() uint64 {
 	c.Lock()
 	sz := c.size
 	c.Unlock()
@@ -148,7 +148,7 @@ func (c *Shard) Size() uint64 {
 // If the cache is over capacity, clear elements (starting at the end of the list) until it is back under
 // capacity. Note that this method is not threadsafe (it should only be called from other methods which
 // already hold the lock).
-func (c *Shard) trim() {
+func (c *Bucket) trim() {
 	for c.size > c.capacity {
 		elt := c.list.Back()
 		v := c.list.Remove(elt).(*cacheValue)

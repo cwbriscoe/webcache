@@ -4,32 +4,32 @@ package webcache
 
 import "hash/fnv"
 
-const defaultShards = 16
+const defaultBuckets = 16
 
-// WebCache is a sharded cache with a specified number of shards.
+// WebCache is a sharded cache with a specified number of buckets.
 type WebCache struct {
-	shards   int
+	buckets  int
 	capacity uint64
-	cache    []*Shard
+	cache    []*Bucket
 }
 
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.
-func NewWebCache(capacity uint64, shards int) *WebCache {
-	//shards must be between 1 and 256
-	if shards <= 0 || shards > 256 {
-		shards = defaultShards
+func NewWebCache(capacity uint64, buckets int) *WebCache {
+	//buckets must be between 1 and 256
+	if buckets <= 0 || buckets > 256 {
+		buckets = defaultBuckets
 	}
 
 	webCache := &WebCache{
-		shards:   shards,
+		buckets:  buckets,
 		capacity: capacity,
 	}
 
-	webCache.cache = make([]*Shard, shards)
+	webCache.cache = make([]*Bucket, buckets)
 
 	//create the shards/buckets
-	for i := 0; i < shards; i++ {
-		webCache.cache[i] = NewShard(capacity / uint64(shards))
+	for i := 0; i < buckets; i++ {
+		webCache.cache[i] = NewBucket(capacity / uint64(buckets))
 	}
 
 	return webCache
@@ -50,10 +50,10 @@ func (c *WebCache) Delete(key string) {
 	c.cache[c.getShard(key)].Delete(key)
 }
 
-// Size reports the WebCache size as reported by the shards.
+// Size reports the WebCache size as reported by the buckets.
 func (c *WebCache) Size() uint64 {
 	var sum uint64
-	for i := 0; i < c.shards; i++ {
+	for i := 0; i < c.buckets; i++ {
 		sum += c.cache[i].Size()
 	}
 	return sum
@@ -62,5 +62,5 @@ func (c *WebCache) Size() uint64 {
 func (c *WebCache) getShard(key string) uint64 {
 	hash := fnv.New64a()
 	hash.Write([]byte(key))
-	return hash.Sum64() % uint64(c.shards)
+	return hash.Sum64() % uint64(c.buckets)
 }
