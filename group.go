@@ -1,3 +1,5 @@
+//Copyright 2020 Christopher Briscoe.  All rights reserved.
+
 package webcache
 
 import (
@@ -10,21 +12,14 @@ type getter interface {
 	get(ctx context.Context, key string) ([]byte, error)
 }
 
-// GetterFunc implements Getter with a function.
-type GetterFunc func(ctx context.Context, key string) ([]byte, error)
-
-func (f GetterFunc) get(ctx context.Context, key string) ([]byte, error) {
-	return f(ctx, key)
-}
-
 type call struct {
-	wg  sync.WaitGroup
+	sync.WaitGroup
 	val []byte
 	err error
 }
 
 type group struct {
-	mu     sync.Mutex
+	sync.Mutex
 	name   string
 	getter getter
 	calls  map[string]*call
@@ -41,28 +36,31 @@ func newGroup(name string, getter getter) (*group, error) {
 	}, nil
 }
 
-// do ensures fn() is called only once
+// do ensures fn() is called only once per group key
 func (g *group) do(ctx context.Context, key string) ([]byte, bool, error) {
-	g.mu.Lock()
+	g.Lock()
+
 	if g.calls == nil {
 		g.calls = make(map[string]*call)
 	}
+
 	if c, ok := g.calls[key]; ok {
-		g.mu.Unlock()
-		c.wg.Wait()
+		g.Unlock()
+		c.Wait()
 		return c.val, true, c.err
 	}
+
 	c := new(call)
-	c.wg.Add(1)
+	c.Add(1)
 	g.calls[key] = c
-	g.mu.Unlock()
+	g.Unlock()
 
 	c.val, c.err = g.getter.get(ctx, key)
-	c.wg.Done()
+	c.Done()
 
-	g.mu.Lock()
+	g.Lock()
 	delete(g.calls, key)
-	g.mu.Unlock()
+	g.Unlock()
 
 	return c.val, false, c.err
 }
