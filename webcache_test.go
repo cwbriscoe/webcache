@@ -5,6 +5,7 @@ package webcache
 import (
 	"context"
 	"crypto/sha1"
+	"errors"
 	"hash/fnv"
 	"math/rand"
 	"runtime"
@@ -144,6 +145,10 @@ type APITest2 struct {
 }
 
 func (a *APITest2) get(ctx context.Context, key string) ([]byte, error) {
+	if len(key) == 1 {
+		return nil, errors.New("Invalid key: " + key)
+	}
+
 	value := key + key + key + key + key
 	time.Sleep(100 * time.Millisecond)
 	return []byte(value), nil
@@ -157,18 +162,41 @@ func TestGroupMultiGet(t *testing.T) {
 	a := &APITest2{}
 	cache.AddGroup(grp, a)
 
-	f := func(t *testing.T) {
+	f1 := func(t *testing.T) {
 		t.Parallel()
 		_, _, _ = cache.Get(nil, grp, key, "")
 		//fmt.Println(etag, string(getval))
 	}
 
-	t.Run("group", func(t *testing.T) {
+	var cnt int64
+	f2 := func(t *testing.T) {
+		t.Parallel()
+		_, _, _ = cache.Get(nil, grp, strconv.FormatInt(cnt, 10), "")
+		cnt++
+	}
+
+	t.Run("group1", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
-			//fmt.Println("Submitting %n", i)
-			t.Run(strconv.FormatInt(int64(i), 10), f)
+			t.Run(strconv.FormatInt(int64(i), 10), f1)
 		}
 	})
+
+	t.Run("group2", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			t.Run(strconv.FormatInt(int64(i), 10), f2)
+		}
+	})
+
+	stats := cache.Stats()
+	if stats.GetCalls != 1 {
+		t.Errorf("Expected GetCalls to be one: %d", stats.GetCalls)
+	}
+	if stats.GetDupes != 9 {
+		t.Errorf("Expected GetDupes to be 9: %d", stats.GetDupes)
+	}
+	if stats.Misses != 10 {
+		t.Errorf("Expected Misses to be 10: %d", stats.Misses)
+	}
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
