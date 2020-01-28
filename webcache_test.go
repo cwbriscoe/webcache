@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -171,8 +172,8 @@ func TestGroupMultiGet(t *testing.T) {
 	var cnt int64
 	f2 := func(t *testing.T) {
 		t.Parallel()
-		_, _, _ = cache.Get(nil, grp, strconv.FormatInt(cnt, 10), "")
-		cnt++
+		_, _, _ = cache.Get(nil, grp, strconv.FormatInt(atomic.LoadInt64(&cnt), 10), "")
+		atomic.AddInt64(&cnt, 1)
 	}
 
 	t.Run("group1", func(t *testing.T) {
