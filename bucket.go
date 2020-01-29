@@ -208,6 +208,9 @@ func (c *Bucket) Stats() *CacheStats {
 func (c *Bucket) trim() {
 	for c.stats.Size > c.stats.Capacity {
 		elt := c.list.Back()
+		if elt == nil {
+			break
+		}
 		v := c.list.Remove(elt).(*cacheValue)
 		delete(c.table, v.key)
 		c.stats.Size -= v.size()

@@ -138,6 +138,14 @@ func TestTrim(t *testing.T) {
 	}
 }
 
+func TestTrimOverflow(t *testing.T) {
+	cache := createWebCache(t, 10, 1)
+	key := "key"
+	val := "0123456789ABCDEF"
+
+	cache.Set("", key, []byte(val))
+}
+
 type APITest1 struct {
 }
 
