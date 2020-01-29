@@ -71,6 +71,7 @@ func (c *WebCache) Stats() *CacheStats {
 		stats.CacheHits += bucketStats.CacheHits
 		stats.GetCalls += bucketStats.GetCalls
 		stats.GetDupes += bucketStats.GetDupes
+		stats.GetErrors += bucketStats.GetErrors
 		stats.Misses += bucketStats.Misses
 		stats.Capacity += bucketStats.Capacity
 		stats.Size += bucketStats.Size

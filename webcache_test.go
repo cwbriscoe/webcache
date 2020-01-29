@@ -255,8 +255,8 @@ func TestGroupMultiGet(t *testing.T) {
 	if stats.GetDupes != 9 {
 		t.Errorf("Expected GetDupes to be 9: %d", stats.GetDupes)
 	}
-	if stats.Misses != 10 {
-		t.Errorf("Expected Misses to be 10: %d", stats.Misses)
+	if stats.GetErrors != 10 {
+		t.Errorf("Expected GetErrors to be 10: %d", stats.Misses)
 	}
 }
 

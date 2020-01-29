@@ -50,6 +50,7 @@ type CacheStats struct {
 	CacheHits int64
 	GetCalls  int64
 	GetDupes  int64
+	GetErrors int64
 	Misses    int64
 	Capacity  int64
 	Size      int64
@@ -139,7 +140,7 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		}
 		value, dupe, err := grp.do(ctx, key)
 		if err != nil {
-			atomic.AddInt64(&c.stats.Misses, 1)
+			atomic.AddInt64(&c.stats.GetErrors, 1)
 			return nil, "", err
 		}
 		//now set the value from the do(key) call into the cache
@@ -196,6 +197,7 @@ func (c *Bucket) Stats() *CacheStats {
 		CacheHits: atomic.LoadInt64(&c.stats.CacheHits),
 		GetCalls:  atomic.LoadInt64(&c.stats.GetCalls),
 		GetDupes:  atomic.LoadInt64(&c.stats.GetDupes),
+		GetErrors: atomic.LoadInt64(&c.stats.GetErrors),
 		Misses:    atomic.LoadInt64(&c.stats.Misses),
 		Capacity:  atomic.LoadInt64(&c.stats.Capacity),
 		Size:      atomic.LoadInt64(&c.stats.Size),
