@@ -88,29 +88,29 @@ func (c *Bucket) AddGroup(group string, getter getter) error {
 	return nil
 }
 
+// deleteKey will delete from the cache and etag map.
+// the mutex must be locked before calling this function.
+func (c *Bucket) deleteKey(key string) {
+	elt, ok := c.table[key]
+	if ok {
+		delete(c.table, key)
+		v := c.list.Remove(elt).(*cacheValue)
+		atomic.AddInt64(&c.stats.Size, -v.size())
+	}
+
+	//delete the etag
+	val, ok := c.etags[key]
+	if ok {
+		delete(c.etags, key)
+		atomic.AddInt64(&c.stats.Size, -int64(len(key)+len(val)))
+	}
+}
+
 // Delete the value indicated by the key, if it is present.
 func (c *Bucket) Delete(group string, key string) {
 	cacheKey := group + key
 	c.Lock()
-
-	elt, ok := c.table[cacheKey]
-	if !ok {
-		c.Unlock()
-		return
-	}
-	delete(c.table, cacheKey)
-	v := c.list.Remove(elt).(*cacheValue)
-	atomic.AddInt64(&c.stats.Size, -v.size())
-
-	//delete the etag
-	val, ok := c.etags[cacheKey]
-	if !ok {
-		c.Unlock()
-		return
-	}
-
-	delete(c.etags, cacheKey)
-	atomic.AddInt64(&c.stats.Size, -int64(len(cacheKey)+len(val)))
+	c.deleteKey(cacheKey)
 	c.Unlock()
 }
 
@@ -167,30 +167,22 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 
 // Set inserts some {key, value} into the cache.
 func (c *Bucket) Set(group string, key string, value []byte) string {
-	var osz int64
 	cacheKey := group + key
 	c.Lock()
 
-	oelt, ok := c.table[cacheKey]
-	if ok {
-		ov := c.list.Remove(oelt).(*cacheValue)
-		osz = ov.size()
-	}
+	c.deleteKey(cacheKey)
 
 	v := &cacheValue{cacheKey, value}
 	elt := c.list.PushFront(v)
 	c.table[cacheKey] = elt
-	atomic.AddInt64(&c.stats.Size, v.size()-osz)
+	atomic.AddInt64(&c.stats.Size, v.size())
 
 	//save the etag
-	_, ok = c.etags[cacheKey]
 	hash := fnv.New64a()
 	hash.Write(value)
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
 	c.etags[cacheKey] = hashstr
-	if !ok {
-		atomic.AddInt64(&c.stats.Size, int64(len(cacheKey)+len(hashstr)))
-	}
+	atomic.AddInt64(&c.stats.Size, int64(len(cacheKey)+len(hashstr)))
 
 	c.trim()
 	c.Unlock()

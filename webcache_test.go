@@ -4,9 +4,7 @@ package webcache
 
 import (
 	"context"
-	"crypto/sha1"
 	"errors"
-	"hash/fnv"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -107,12 +105,66 @@ func TestSimpleGetWrongKey(t *testing.T) {
 	}
 }
 
+func TestTrim(t *testing.T) {
+	cache := createWebCache(t, 64, 1)
+	if cache.Stats().Capacity != 64 {
+		t.Errorf("Expected capacity to be %d, but got '%d'", 64, cache.Stats().Capacity)
+	}
+	key := "key"
+	val := "0123456789"
+
+	etag := cache.Set("", key, []byte(val))
+	esz := int64(len(key)*2 + len(val) + len(etag))
+	sz := cache.Stats().Size
+	if sz != esz {
+		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
+	}
+
+	key = "abc"
+	etag = cache.Set("", key, []byte(val))
+	esz += int64(len(key)*2 + len(val) + len(etag))
+	sz = cache.Stats().Size
+	if sz != esz {
+		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
+	}
+
+	key = "def"
+	etag = cache.Set("", key, []byte(val))
+	esz += int64(len(key)*2 + len(val) + len(etag))
+	esz -= int64(len(key)+len(val)) * 3
+	sz = cache.Stats().Size
+	if sz != esz {
+		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
+	}
+}
+
 type APITest1 struct {
 }
 
 func (a *APITest1) get(ctx context.Context, key string) ([]byte, error) {
 	value := key + key + key + key + key
 	return []byte(value), nil
+}
+
+func TestGroupAdd(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestGroupGet"
+
+	a := &APITest1{}
+	err := cache.AddGroup(grp, a)
+	if err != nil {
+		t.Errorf("Did not expect AddGroup to return an error: '%s'", err)
+	}
+	err = cache.AddGroup(grp, a)
+	if err == nil {
+		t.Errorf("Expected AddGroup to return an error'")
+	}
+
+	grp = "TestGroupGetNil"
+	err = cache.AddGroup(grp, nil)
+	if err == nil {
+		t.Errorf("Expected AddGroup to return an error with nil getter'")
+	}
 }
 
 func TestGroupGet(t *testing.T) {
@@ -353,16 +405,6 @@ func TestRace(t *testing.T) {
 	}
 
 	wg.Wait()
-}
-
-func (c *WebCache) getShardSha1(key string) int {
-	return int(sha1.Sum([]byte(key))[0]) % c.buckets
-}
-
-func (c *WebCache) getShardTest(key string) uint64 {
-	hash := fnv.New64a()
-	hash.Write([]byte(key))
-	return hash.Sum64() % uint64(c.buckets)
 }
 
 func benchmarkRealSharded(b *testing.B, ratio int) {
