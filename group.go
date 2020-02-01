@@ -1,4 +1,4 @@
-//Copyright 2020 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 Christopher Briscoe.  All rights reserved.
 
 package webcache
 

@@ -1,4 +1,4 @@
-//Copyright 2020 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 Christopher Briscoe.  All rights reserved.
 
 // Package webcache is A simple LRU cache for storing documents ([]byte). When the size maximum is reached,
 // items are evicted starting with the least recently used. This data structure is goroutine-safe (it has

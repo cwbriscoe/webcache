@@ -1,4 +1,4 @@
-//Copyright 2020 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 Christopher Briscoe.  All rights reserved.
 
 package webcache
 
@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cwbriscoe/testy"
 )
 
 func createWebCache(t *testing.T, capacity int64, buckets int) Cacher {
@@ -25,24 +27,16 @@ func createWebCache(t *testing.T, capacity int64, buckets int) Cacher {
 
 func TestBucketCount(t *testing.T) {
 	cache := NewWebCache(10000, 0)
-	if cache.buckets != defaultBuckets {
-		t.Errorf("Expected defaultBucket when setting buckets to 0")
-	}
+	testy.Equals(t, cache.buckets, defaultBuckets)
 
 	cache = NewWebCache(10000, 999)
-	if cache.buckets != defaultBuckets {
-		t.Errorf("Expected defaultBucket when setting buckets to > 256")
-	}
+	testy.Equals(t, cache.buckets, defaultBuckets)
 
 	cache = NewWebCache(10000, 1)
-	if cache.buckets != 1 {
-		t.Errorf("Expected buckets to be 1 when setting buckets to 1")
-	}
+	testy.Equals(t, cache.buckets, 1)
 
 	cache = NewWebCache(10000, 2)
-	if cache.buckets != 2 {
-		t.Errorf("Expected buckets to be 2 when setting buckets to 2")
-	}
+	testy.Equals(t, cache.buckets, 2)
 }
 
 func TestSimpleSet(t *testing.T) {
@@ -53,17 +47,9 @@ func TestSimpleSet(t *testing.T) {
 	etag1 := cache.Set("", key, []byte(val))
 	getval, etag2, err := cache.Get(nil, "", key, "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
-
-	if etag1 != etag2 {
-		t.Errorf("Expected etag1 to equal etag2: '%s' '%s'", etag1, etag2)
-	}
-
-	if val != string(getval) {
-		t.Errorf("Expected Set() value to be '%s' instead of '%s'", val, string(getval))
-	}
+	testy.Ok(t, err)
+	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, val, string(getval))
 }
 
 func TestGroupSet(t *testing.T) {
@@ -75,17 +61,9 @@ func TestGroupSet(t *testing.T) {
 	etag1 := cache.Set(grp, key, []byte(val))
 	getval, etag2, err := cache.Get(nil, grp, key, "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
-
-	if etag1 != etag2 {
-		t.Errorf("Expected etag1 to equal etag2: '%s' '%s'", etag1, etag2)
-	}
-
-	if val != string(getval) {
-		t.Errorf("Expected Set() value to be '%s' instead of '%s'", val, string(getval))
-	}
+	testy.Ok(t, err)
+	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, val, string(getval))
 }
 
 func TestSimpleGetWrongKey(t *testing.T) {
@@ -96,13 +74,8 @@ func TestSimpleGetWrongKey(t *testing.T) {
 	cache.Set("", key, []byte(val))
 	getval, _, err := cache.Get(nil, "", "notkey", "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
-
-	if getval != nil {
-		t.Errorf("Expected Get() value to be nil instead of '%s'", string(getval))
-	}
+	testy.Ok(t, err)
+	testy.Nil(t, getval)
 }
 
 func TestTrim(t *testing.T) {
@@ -116,26 +89,20 @@ func TestTrim(t *testing.T) {
 	etag := cache.Set("", key, []byte(val))
 	esz := int64(len(key)*2 + len(val) + len(etag))
 	sz := cache.Stats().Size
-	if sz != esz {
-		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
-	}
+	testy.Equals(t, sz, esz)
 
 	key = "abc"
 	etag = cache.Set("", key, []byte(val))
 	esz += int64(len(key)*2 + len(val) + len(etag))
 	sz = cache.Stats().Size
-	if sz != esz {
-		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
-	}
+	testy.Equals(t, sz, esz)
 
 	key = "def"
 	etag = cache.Set("", key, []byte(val))
 	esz += int64(len(key)*2 + len(val) + len(etag))
 	esz -= int64(len(key)+len(val)) * 3
 	sz = cache.Stats().Size
-	if sz != esz {
-		t.Errorf("Expected size to be %d, but got '%d'", esz, sz)
-	}
+	testy.Equals(t, sz, esz)
 }
 
 func TestTrimOverflow(t *testing.T) {
@@ -160,19 +127,14 @@ func TestGroupAdd(t *testing.T) {
 
 	a := &APITest1{}
 	err := cache.AddGroup(grp, a)
-	if err != nil {
-		t.Errorf("Did not expect AddGroup to return an error: '%s'", err)
-	}
+	testy.Ok(t, err)
+
 	err = cache.AddGroup(grp, a)
-	if err == nil {
-		t.Errorf("Expected AddGroup to return an error'")
-	}
+	testy.NotOk(t, err)
 
 	grp = "TestGroupGetNil"
 	err = cache.AddGroup(grp, nil)
-	if err == nil {
-		t.Errorf("Expected AddGroup to return an error with nil getter'")
-	}
+	testy.NotOk(t, err)
 }
 
 func TestGroupGet(t *testing.T) {
@@ -184,22 +146,12 @@ func TestGroupGet(t *testing.T) {
 	cache.AddGroup(grp, a)
 
 	getval, etag1, err := cache.Get(nil, grp, key, "")
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
+	testy.Ok(t, err)
 
 	getval, etag2, err := cache.Get(nil, grp, key, "")
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
-
-	if etag1 != etag2 {
-		t.Errorf("Expected etag1 to equal etag2: '%s' '%s'", etag1, etag2)
-	}
-
-	if getval == nil {
-		t.Errorf("Expected Get() value to not be nil")
-	}
+	testy.Ok(t, err)
+	testy.Equals(t, etag1, etag2)
+	testy.NotNil(t, getval)
 }
 
 type APITest2 struct {
@@ -226,7 +178,6 @@ func TestGroupMultiGet(t *testing.T) {
 	f1 := func(t *testing.T) {
 		t.Parallel()
 		_, _, _ = cache.Get(nil, grp, key, "")
-		//fmt.Println(etag, string(getval))
 	}
 
 	var cnt int64
@@ -249,15 +200,9 @@ func TestGroupMultiGet(t *testing.T) {
 	})
 
 	stats := cache.Stats()
-	if stats.GetCalls != 1 {
-		t.Errorf("Expected GetCalls to be one: %d", stats.GetCalls)
-	}
-	if stats.GetDupes != 9 {
-		t.Errorf("Expected GetDupes to be 9: %d", stats.GetDupes)
-	}
-	if stats.GetErrors != 10 {
-		t.Errorf("Expected GetErrors to be 10: %d", stats.Misses)
-	}
+	testy.Equals(t, stats.GetCalls, int64(1))
+	testy.Equals(t, stats.GetDupes, int64(9))
+	testy.Equals(t, stats.GetErrors, int64(10))
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
@@ -269,17 +214,9 @@ func TestGroupGetWrongKey(t *testing.T) {
 	etag1 := cache.Set(grp, key, []byte(val))
 	getval, etag2, err := cache.Get(nil, grp, "notkey", "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: '%s'", err)
-	}
-
-	if etag1 == etag2 {
-		t.Errorf("Expected etag1 to not equal etag2: '%s' '%s'", etag1, etag2)
-	}
-
-	if getval != nil {
-		t.Errorf("Expected Get() value to be nil instead of '%s'", string(getval))
-	}
+	testy.Ok(t, err)
+	testy.NotEquals(t, etag1, etag2)
+	testy.Nil(t, getval)
 }
 
 func TestSimpleDelete(t *testing.T) {
@@ -291,13 +228,8 @@ func TestSimpleDelete(t *testing.T) {
 	cache.Delete("", key)
 	getval, _, err := cache.Get(nil, "", key, "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: %s", err)
-	}
-
-	if getval != nil {
-		t.Errorf("Expected Delete() value to be deleted")
-	}
+	testy.Ok(t, err)
+	testy.Nil(t, getval)
 }
 
 func TestGroupDelete(t *testing.T) {
@@ -310,17 +242,9 @@ func TestGroupDelete(t *testing.T) {
 	cache.Delete(grp, key)
 	getval, etag, err := cache.Get(nil, grp, key, "")
 
-	if err != nil {
-		t.Errorf("Did not expect Get() to return an error: %s", err)
-	}
-
-	if etag != "" {
-		t.Errorf("Did not expect etag to have a value: '%s'", etag)
-	}
-
-	if getval != nil {
-		t.Errorf("Expected Delete() value to be deleted")
-	}
+	testy.Ok(t, err)
+	testy.Equals(t, etag, "")
+	testy.Nil(t, getval)
 }
 
 func TestStats(t *testing.T) {
@@ -353,41 +277,29 @@ func TestStats(t *testing.T) {
 	cache.Set(grp, key, []byte(val+val))
 	cache.Delete(grp, key)
 	size = cache.Stats().Size
-	if size != 0 {
-		t.Errorf("Expected Size to be zero: %d", size)
-	}
+	testy.Equals(t, size, int64(0))
 
 	etag := cache.Set(grp, key, []byte(val))
 	_, _, _ = cache.Get(nil, grp, key, "")
 	hits := cache.Stats().CacheHits
-	if hits != 1 {
-		t.Errorf("Expected CacheHits to be one: %d", hits)
-	}
+	testy.Equals(t, hits, int64(1))
 
 	_, _, _ = cache.Get(nil, grp, key, etag)
 	hits = cache.Stats().EtagHits
-	if hits != 1 {
-		t.Errorf("Expected EtagHits to be one: %d", hits)
-	}
+	testy.Equals(t, hits, int64(1))
 
 	_, _, _ = cache.Get(nil, "", key+"1", etag)
 	misses := cache.Stats().Misses
-	if misses != 1 {
-		t.Errorf("Expected Misses to be one: %d", misses)
-	}
+	testy.Equals(t, misses, int64(1))
 
 	_, _, _ = cache.Get(nil, grp, key+"1", "")
 	calls := cache.Stats().GetCalls
-	if calls != 1 {
-		t.Errorf("Expected GetCalls to be one: %d", calls)
-	}
+	testy.Equals(t, calls, int64(1))
 
 	cache.Delete(grp, key)
 	cache.Delete(grp, key+"1")
 	size = cache.Stats().Size
-	if size != 0 {
-		t.Errorf("Expected Size to be zero: %d", size)
-	}
+	testy.Equals(t, size, int64(0))
 }
 
 var raceShardedCache = NewWebCache(10000, 8)
