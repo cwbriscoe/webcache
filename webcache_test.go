@@ -333,7 +333,6 @@ func BenchmarkFnv(b *testing.B) {
 	value := []byte(strings.Repeat("X", 1000))
 	b.ResetTimer()
 
-	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			hash := fnv.New64a()
@@ -351,7 +350,6 @@ func BenchmarkXXHash(b *testing.B) {
 	value := []byte(strings.Repeat("X", 1000))
 	b.ResetTimer()
 
-	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			hash := xxhash.New()
@@ -366,16 +364,15 @@ func BenchmarkXXHash(b *testing.B) {
 }
 
 func benchmarkRealSharded(b *testing.B, ratio int) {
-	cache := NewWebCache(200000, 16)
+	cache := NewWebCache(2000000, 24)
 	b.ResetTimer()
 
-	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			keynum := rand.Intn(1000)
 			key := strconv.FormatUint(uint64(keynum), 10)
 			if keynum < 100*ratio {
-				sz := rand.Intn(2000) + 1
+				sz := rand.Intn(20000) + 1
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
 			} else {
@@ -386,16 +383,15 @@ func benchmarkRealSharded(b *testing.B, ratio int) {
 }
 
 func benchmarkRealNotSharded(b *testing.B, ratio int) {
-	cache := NewBucket(200000)
+	cache := NewBucket(2000000)
 	b.ResetTimer()
 
-	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			keynum := rand.Intn(1000)
 			key := strconv.FormatUint(uint64(keynum), 10)
 			if keynum < 100*ratio {
-				sz := rand.Intn(2000) + 1
+				sz := rand.Intn(20000) + 1
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
 			} else {
