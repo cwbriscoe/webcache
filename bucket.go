@@ -9,10 +9,11 @@ import (
 	"container/list"
 	"context"
 	"errors"
-	"hash/fnv"
 	"strconv"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 type cacheValue struct {
@@ -179,7 +180,7 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	atomic.AddInt64(&c.stats.Size, v.size())
 
 	//save the etag
-	hash := fnv.New64a()
+	hash := xxhash.New()
 	hash.Write(value)
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
 	c.etags[cacheKey] = hashstr

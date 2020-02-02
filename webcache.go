@@ -4,7 +4,8 @@ package webcache
 
 import (
 	"context"
-	"hash/fnv"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 const defaultBuckets = 16
@@ -80,7 +81,7 @@ func (c *WebCache) Stats() *CacheStats {
 }
 
 func (c *WebCache) getShard(key string) uint64 {
-	hash := fnv.New64a()
+	hash := xxhash.New()
 	hash.Write([]byte(key))
 	return hash.Sum64() % uint64(c.buckets)
 }

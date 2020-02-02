@@ -1,2 +1,4 @@
+github.com/cespare/xxhash/v2 v2.1.1 h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=
+github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cwbriscoe/testy v0.0.0-20200202012735-841fa350e117 h1:v7DD2F4QE8Rdo/dSlpw87PgVaRlaRuImwWS6DAULqOA=
 github.com/cwbriscoe/testy v0.0.0-20200202012735-841fa350e117/go.mod h1:fBBPrBmtoyAQVgD5ynw6PQrr2gBP4H5QFEKfT7J5Rvw=

@@ -5,6 +5,7 @@ package webcache
 import (
 	"context"
 	"errors"
+	"hash/fnv"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/cwbriscoe/testy"
 )
 
@@ -325,6 +327,42 @@ func TestRace(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func BenchmarkFnv(b *testing.B) {
+	value := []byte(strings.Repeat("X", 1000))
+	b.ResetTimer()
+
+	b.SetParallelism(16)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			hash := fnv.New64a()
+			hash.Write(value)
+			sum := hash.Sum64()
+			hashstr := strconv.FormatUint(sum, 16)
+			if len(hashstr) == 0 {
+				b.Errorf("hashstring is zero")
+			}
+		}
+	})
+}
+
+func BenchmarkXXHash(b *testing.B) {
+	value := []byte(strings.Repeat("X", 1000))
+	b.ResetTimer()
+
+	b.SetParallelism(16)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			hash := xxhash.New()
+			hash.Write(value)
+			sum := hash.Sum64()
+			hashstr := strconv.FormatUint(sum, 16)
+			if len(hashstr) == 0 {
+				b.Errorf("hashstring is zero")
+			}
+		}
+	})
 }
 
 func benchmarkRealSharded(b *testing.B, ratio int) {
