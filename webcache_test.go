@@ -200,9 +200,9 @@ func TestGroupMultiGet(t *testing.T) {
 	})
 
 	stats := cache.Stats()
-	testy.Equals(t, stats.GetCalls, int64(1))
-	testy.Equals(t, stats.GetDupes, int64(9))
-	testy.Equals(t, stats.GetErrors, int64(10))
+	testy.Equals(t, stats.GetCalls, 1)
+	testy.Equals(t, stats.GetDupes, 9)
+	testy.Equals(t, stats.GetErrors, 10)
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
@@ -277,29 +277,29 @@ func TestStats(t *testing.T) {
 	cache.Set(grp, key, []byte(val+val))
 	cache.Delete(grp, key)
 	size = cache.Stats().Size
-	testy.Equals(t, size, int64(0))
+	testy.Equals(t, size, 0)
 
 	etag := cache.Set(grp, key, []byte(val))
 	_, _, _ = cache.Get(nil, grp, key, "")
 	hits := cache.Stats().CacheHits
-	testy.Equals(t, hits, int64(1))
+	testy.Equals(t, hits, 1)
 
 	_, _, _ = cache.Get(nil, grp, key, etag)
 	hits = cache.Stats().EtagHits
-	testy.Equals(t, hits, int64(1))
+	testy.Equals(t, hits, 1)
 
 	_, _, _ = cache.Get(nil, "", key+"1", etag)
 	misses := cache.Stats().Misses
-	testy.Equals(t, misses, int64(1))
+	testy.Equals(t, misses, 1)
 
 	_, _, _ = cache.Get(nil, grp, key+"1", "")
 	calls := cache.Stats().GetCalls
-	testy.Equals(t, calls, int64(1))
+	testy.Equals(t, calls, 1)
 
 	cache.Delete(grp, key)
 	cache.Delete(grp, key+"1")
 	size = cache.Stats().Size
-	testy.Equals(t, size, int64(0))
+	testy.Equals(t, size, 0)
 }
 
 var raceShardedCache = NewWebCache(10000, 8)
