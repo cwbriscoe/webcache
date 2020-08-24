@@ -118,7 +118,7 @@ func TestTrimOverflow(t *testing.T) {
 type APITest1 struct {
 }
 
-func (a *APITest1) get(ctx context.Context, key string) ([]byte, error) {
+func (a *APITest1) Get(ctx context.Context, key string) ([]byte, error) {
 	value := key + key + key + key + key
 	return []byte(value), nil
 }
@@ -159,7 +159,7 @@ func TestGroupGet(t *testing.T) {
 type APITest2 struct {
 }
 
-func (a *APITest2) get(ctx context.Context, key string) ([]byte, error) {
+func (a *APITest2) Get(ctx context.Context, key string) ([]byte, error) {
 	if len(key) == 1 {
 		return nil, errors.New("Invalid key: " + key)
 	}

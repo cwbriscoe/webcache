@@ -9,7 +9,7 @@ import (
 )
 
 type getter interface {
-	get(ctx context.Context, key string) ([]byte, error)
+	Get(ctx context.Context, key string) ([]byte, error)
 }
 
 type call struct {
@@ -55,7 +55,7 @@ func (g *group) do(ctx context.Context, key string) ([]byte, bool, error) {
 	g.calls[key] = c
 	g.Unlock()
 
-	c.val, c.err = g.getter.get(ctx, key)
+	c.val, c.err = g.getter.Get(ctx, key)
 	c.Done()
 
 	g.Lock()
