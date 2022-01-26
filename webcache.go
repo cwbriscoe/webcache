@@ -12,8 +12,8 @@ const defaultBuckets = 16
 
 // WebCache is a sharded cache with a specified number of buckets.
 type WebCache struct {
-	buckets int
 	cache   []*Bucket
+	buckets int
 }
 
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.

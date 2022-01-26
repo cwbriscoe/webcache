@@ -47,7 +47,7 @@ func TestSimpleSet(t *testing.T) {
 	val := "TestSimpleSet"
 
 	etag1 := cache.Set("", key, []byte(val))
-	getval, etag2, err := cache.Get(nil, "", key, "")
+	getval, etag2, err := cache.Get(context.TODO(), "", key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, etag1, etag2)
@@ -61,7 +61,7 @@ func TestGroupSet(t *testing.T) {
 	val := key + "value"
 
 	etag1 := cache.Set(grp, key, []byte(val))
-	getval, etag2, err := cache.Get(nil, grp, key, "")
+	getval, etag2, err := cache.Get(context.TODO(), grp, key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, etag1, etag2)
@@ -74,7 +74,7 @@ func TestSimpleGetWrongKey(t *testing.T) {
 	val := "value"
 
 	cache.Set("", key, []byte(val))
-	getval, _, err := cache.Get(nil, "", "notkey", "")
+	getval, _, err := cache.Get(context.TODO(), "", "notkey", "")
 
 	testy.Ok(t, err)
 	testy.Nil(t, getval)
@@ -118,7 +118,7 @@ func TestTrimOverflow(t *testing.T) {
 type APITest1 struct {
 }
 
-func (a *APITest1) Get(ctx context.Context, key string) ([]byte, error) {
+func (*APITest1) Get(_ context.Context, key string) ([]byte, error) {
 	value := key + key + key + key + key
 	return []byte(value), nil
 }
@@ -145,12 +145,13 @@ func TestGroupGet(t *testing.T) {
 	key := grp + "key"
 
 	a := &APITest1{}
-	cache.AddGroup(grp, a)
-
-	getval, etag1, err := cache.Get(nil, grp, key, "")
+	err := cache.AddGroup(grp, a)
 	testy.Ok(t, err)
 
-	getval, etag2, err := cache.Get(nil, grp, key, "")
+	_, etag1, err := cache.Get(context.TODO(), grp, key, "")
+	testy.Ok(t, err)
+
+	getval, etag2, err := cache.Get(context.TODO(), grp, key, "")
 	testy.Ok(t, err)
 	testy.Equals(t, etag1, etag2)
 	testy.NotNil(t, getval)
@@ -159,7 +160,7 @@ func TestGroupGet(t *testing.T) {
 type APITest2 struct {
 }
 
-func (a *APITest2) Get(ctx context.Context, key string) ([]byte, error) {
+func (*APITest2) Get(_ context.Context, key string) ([]byte, error) {
 	if len(key) == 1 {
 		return nil, errors.New("Invalid key: " + key)
 	}
@@ -175,17 +176,18 @@ func TestGroupMultiGet(t *testing.T) {
 	key := grp + "key"
 
 	a := &APITest2{}
-	cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, a)
+	testy.Ok(t, err)
 
 	f1 := func(t *testing.T) {
 		t.Parallel()
-		_, _, _ = cache.Get(nil, grp, key, "")
+		_, _, _ = cache.Get(context.TODO(), grp, key, "")
 	}
 
 	var cnt int64
 	f2 := func(t *testing.T) {
 		t.Parallel()
-		_, _, _ = cache.Get(nil, grp, strconv.FormatInt(atomic.LoadInt64(&cnt), 10), "")
+		_, _, _ = cache.Get(context.TODO(), grp, strconv.FormatInt(atomic.LoadInt64(&cnt), 10), "")
 		atomic.AddInt64(&cnt, 1)
 	}
 
@@ -214,7 +216,7 @@ func TestGroupGetWrongKey(t *testing.T) {
 	val := key + "value"
 
 	etag1 := cache.Set(grp, key, []byte(val))
-	getval, etag2, err := cache.Get(nil, grp, "notkey", "")
+	getval, etag2, err := cache.Get(context.TODO(), grp, "notkey", "")
 
 	testy.Ok(t, err)
 	testy.NotEquals(t, etag1, etag2)
@@ -228,7 +230,7 @@ func TestSimpleDelete(t *testing.T) {
 
 	cache.Set("", key, []byte(val))
 	cache.Delete("", key)
-	getval, _, err := cache.Get(nil, "", key, "")
+	getval, _, err := cache.Get(context.TODO(), "", key, "")
 
 	testy.Ok(t, err)
 	testy.Nil(t, getval)
@@ -242,7 +244,7 @@ func TestGroupDelete(t *testing.T) {
 
 	cache.Set(grp, key, []byte(val))
 	cache.Delete(grp, key)
-	getval, etag, err := cache.Get(nil, grp, key, "")
+	getval, etag, err := cache.Get(context.TODO(), grp, key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, etag, "")
@@ -256,7 +258,8 @@ func TestStats(t *testing.T) {
 	val := key + "value"
 
 	a := &APITest1{}
-	cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, a)
+	testy.Ok(t, err)
 
 	cache.Set(grp, key, []byte(val))
 	cache.Set(grp, key+"1", []byte(val))
@@ -282,19 +285,19 @@ func TestStats(t *testing.T) {
 	testy.Equals(t, size, 0)
 
 	etag := cache.Set(grp, key, []byte(val))
-	_, _, _ = cache.Get(nil, grp, key, "")
+	_, _, _ = cache.Get(context.TODO(), grp, key, "")
 	hits := cache.Stats().CacheHits
 	testy.Equals(t, hits, 1)
 
-	_, _, _ = cache.Get(nil, grp, key, etag)
+	_, _, _ = cache.Get(context.TODO(), grp, key, etag)
 	hits = cache.Stats().EtagHits
 	testy.Equals(t, hits, 1)
 
-	_, _, _ = cache.Get(nil, "", key+"1", etag)
+	_, _, _ = cache.Get(context.TODO(), "", key+"1", etag)
 	misses := cache.Stats().Misses
 	testy.Equals(t, misses, 1)
 
-	_, _, _ = cache.Get(nil, grp, key+"1", "")
+	_, _, _ = cache.Get(context.TODO(), grp, key+"1", "")
 	calls := cache.Stats().GetCalls
 	testy.Equals(t, calls, 1)
 
@@ -315,7 +318,8 @@ func TestRace(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			raceShardedCache.Set("", key, v)
 			raceShardedCache.Stats() //to detect race condition, nothing else
-			raceShardedCache.Get(nil, "", key, "")
+			_, _, err := raceShardedCache.Get(context.TODO(), "", key, "")
+			testy.Ok(t, err)
 			raceShardedCache.Delete("", key)
 		}
 		wg.Done()
@@ -336,7 +340,7 @@ func BenchmarkFnv(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			hash := fnv.New64a()
-			hash.Write(value)
+			_, _ = hash.Write(value)
 			sum := hash.Sum64()
 			hashstr := strconv.FormatUint(sum, 16)
 			if len(hashstr) == 0 {
@@ -376,7 +380,7 @@ func benchmarkRealSharded(b *testing.B, ratio int) {
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
 			} else {
-				cache.Get(nil, "", key, "")
+				_, _, _ = cache.Get(context.TODO(), "", key, "")
 			}
 		}
 	})
@@ -395,7 +399,7 @@ func benchmarkRealNotSharded(b *testing.B, ratio int) {
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
 			} else {
-				cache.Get(nil, "", key, "")
+				_, _, _ = cache.Get(context.TODO(), "", key, "")
 			}
 		}
 	})

@@ -14,15 +14,15 @@ type getter interface {
 
 type call struct {
 	sync.WaitGroup
-	val []byte
 	err error
+	val []byte
 }
 
 type group struct {
 	sync.Mutex
-	name   string
 	getter getter
 	calls  map[string]*call
+	name   string
 }
 
 func newGroup(name string, getter getter) (*group, error) {

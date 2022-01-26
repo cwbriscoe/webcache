@@ -38,11 +38,11 @@ type Cacher interface {
 // Bucket is a simple LRU cache with Etag support
 type Bucket struct {
 	sync.Mutex
-	stats  CacheStats
 	list   *list.List
 	groups map[string]*group
 	table  map[string]*list.Element
 	etags  map[string]string
+	stats  CacheStats
 }
 
 // CacheStats keeps track of cache statistics
@@ -122,7 +122,7 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 	c.Lock()
 
 	//return if the etag matches the etag cache
-	hash, _ := c.etags[cacheKey]
+	hash := c.etags[cacheKey]
 	if etag != "" && etag == hash {
 		c.Unlock()
 		atomic.AddInt64(&c.stats.EtagHits, 1)
@@ -146,13 +146,13 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		}
 		//now set the value from the do(key) call into the cache
 		var newEtag string
-		if dupe == false {
+		if !dupe {
 			newEtag = c.Set(group, key, value)
 			atomic.AddInt64(&c.stats.GetCalls, 1)
 		} else {
 			//try to get etag from etag cache for dupe threads on same do(key)
 			c.Lock()
-			newEtag, _ = c.etags[cacheKey]
+			newEtag = c.etags[cacheKey]
 			c.Unlock()
 			atomic.AddInt64(&c.stats.GetDupes, 1)
 		}
