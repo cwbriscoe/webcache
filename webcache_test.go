@@ -115,8 +115,7 @@ func TestTrimOverflow(t *testing.T) {
 	cache.Set("", key, []byte(val))
 }
 
-type APITest1 struct {
-}
+type APITest1 struct{}
 
 func (*APITest1) Get(_ context.Context, key string) ([]byte, error) {
 	value := key + key + key + key + key
@@ -157,8 +156,7 @@ func TestGroupGet(t *testing.T) {
 	testy.NotNil(t, getval)
 }
 
-type APITest2 struct {
-}
+type APITest2 struct{}
 
 func (*APITest2) Get(_ context.Context, key string) ([]byte, error) {
 	if len(key) == 1 {
@@ -317,7 +315,7 @@ func TestRace(t *testing.T) {
 		v := []byte(strings.Repeat("X", 900))
 		for i := 0; i < 5000; i++ {
 			raceShardedCache.Set("", key, v)
-			raceShardedCache.Stats() //to detect race condition, nothing else
+			raceShardedCache.Stats() // to detect race condition, nothing else
 			_, _, err := raceShardedCache.Get(context.TODO(), "", key, "")
 			testy.Ok(t, err)
 			raceShardedCache.Delete("", key)
@@ -401,6 +399,61 @@ func benchmarkRealNotSharded(b *testing.B, ratio int) {
 			} else {
 				_, _, _ = cache.Get(context.TODO(), "", key, "")
 			}
+		}
+	})
+}
+
+type profileGetter struct {
+	data [10][]byte
+	once sync.Once
+}
+
+func (g *profileGetter) Get(_ context.Context, _ string) ([]byte, error) {
+	g.once.Do(func() {
+		for i := 0; i < 10; i++ {
+			g.data[i] = []byte(strings.Repeat("X", 5000*i))
+		}
+	})
+	random := rand.Intn(10)
+	return g.data[random], nil
+}
+
+func BenchmarkForCPUProfileWebCache(b *testing.B) {
+	cache := NewWebCache(100000, 1)
+	_ = cache.AddGroup("group", &profileGetter{})
+	var keys [1000]string
+	for i := 0; i < 1000; i++ {
+		keys[i] = strconv.FormatUint(uint64(i), 10)
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			random := rand.Intn(1000)
+			_, _, _ = cache.Get(context.TODO(), "group", keys[random], "")
+			// not necessary to add a call to Set() since Get calls it often
+			random = rand.Intn(1000)
+			cache.Delete("group", keys[random])
+		}
+	})
+}
+
+func BenchmarkForCPUProfileBucket(b *testing.B) {
+	cache := NewBucket(100000)
+	_ = cache.AddGroup("group", &profileGetter{})
+	var keys [1000]string
+	for i := 0; i < 1000; i++ {
+		keys[i] = strconv.FormatUint(uint64(i), 10)
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			random := rand.Intn(1000)
+			_, _, _ = cache.Get(context.TODO(), "group", keys[random], "")
+			// not necessary to add a call to Set() since Get calls it often
+			random = rand.Intn(1000)
+			cache.Delete("group", keys[random])
 		}
 	})
 }
