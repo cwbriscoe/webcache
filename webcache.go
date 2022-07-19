@@ -1,4 +1,4 @@
-// Copyright 2020 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 - 2022 Christopher Briscoe.  All rights reserved.
 
 package webcache
 
@@ -18,7 +18,7 @@ type WebCache struct {
 
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.
 func NewWebCache(capacity int64, buckets int) *WebCache {
-	//buckets must be between 1 and 256
+	// buckets must be between 1 and 256
 	if buckets <= 0 || buckets > 256 {
 		buckets = defaultBuckets
 	}
@@ -29,7 +29,7 @@ func NewWebCache(capacity int64, buckets int) *WebCache {
 
 	webCache.cache = make([]*Bucket, buckets)
 
-	//create the shards/buckets
+	// create the shards/buckets
 	for i := 0; i < buckets; i++ {
 		webCache.cache[i] = NewBucket(capacity / int64(buckets))
 	}

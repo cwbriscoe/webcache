@@ -1,4 +1,4 @@
-// Copyright 2020 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 - 2022 Christopher Briscoe.  All rights reserved.
 
 // Package webcache is A simple LRU cache for storing documents ([]byte). When the size maximum is reached,
 // items are evicted starting with the least recently used. This data structure is goroutine-safe (it has
@@ -100,7 +100,7 @@ func (c *Bucket) deleteKey(key string) {
 		atomic.AddInt64(&c.stats.Size, -v.size())
 	}
 
-	//delete the etag
+	// delete the etag
 	val, ok := c.etags[key]
 	if ok {
 		delete(c.etags, key)
@@ -121,7 +121,7 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 	cacheKey := group + key
 	c.Lock()
 
-	//return if the etag matches the etag cache
+	// return if the etag matches the etag cache
 	hash := c.etags[cacheKey]
 	if etag != "" && etag == hash {
 		c.Unlock()
@@ -129,10 +129,10 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		return nil, etag, nil
 	}
 
-	//otherwise see if we get a cache hit
+	// otherwise see if we get a cache hit
 	elt, ok := c.table[cacheKey]
 	if !ok {
-		//no cache hit so call the do(key) function for the group
+		// no cache hit so call the do(key) function for the group
 		grp, ok := c.groups[group]
 		c.Unlock()
 		if !ok {
@@ -144,13 +144,13 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 			atomic.AddInt64(&c.stats.GetErrors, 1)
 			return nil, "", err
 		}
-		//now set the value from the do(key) call into the cache
+		// now set the value from the do(key) call into the cache
 		var newEtag string
 		if !dupe {
 			newEtag = c.Set(group, key, value)
 			atomic.AddInt64(&c.stats.GetCalls, 1)
 		} else {
-			//try to get etag from etag cache for dupe threads on same do(key)
+			// try to get etag from etag cache for dupe threads on same do(key)
 			c.Lock()
 			newEtag = c.etags[cacheKey]
 			c.Unlock()
@@ -179,7 +179,7 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	c.table[cacheKey] = elt
 	atomic.AddInt64(&c.stats.Size, v.size())
 
-	//save the etag
+	// save the etag
 	hash := xxhash.New()
 	hash.Write(value)
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
