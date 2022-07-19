@@ -144,6 +144,10 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 			atomic.AddInt64(&c.stats.GetErrors, 1)
 			return nil, "", err
 		}
+		// record a miss if the getter does not return bytes
+		if value == nil {
+			atomic.AddInt64(&c.stats.Misses, 1)
+		}
 		// now set the value from the do(key) call into the cache
 		var newEtag string
 		if !dupe {
