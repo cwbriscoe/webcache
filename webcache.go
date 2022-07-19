@@ -4,6 +4,7 @@ package webcache
 
 import (
 	"context"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -38,9 +39,9 @@ func NewWebCache(capacity int64, buckets int) *WebCache {
 }
 
 // AddGroup adds a new cache group with a getter function
-func (c *WebCache) AddGroup(group string, getter getter) error {
+func (c *WebCache) AddGroup(group string, maxAge time.Duration, getter getter) error {
 	for i := 0; i < c.buckets; i++ {
-		err := c.cache[i].AddGroup(group, getter)
+		err := c.cache[i].AddGroup(group, maxAge, getter)
 		if err != nil {
 			return err
 		}

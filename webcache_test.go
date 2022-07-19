@@ -127,14 +127,14 @@ func TestGroupAdd(t *testing.T) {
 	grp := "TestGroupGet"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
-	err = cache.AddGroup(grp, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.NotOk(t, err)
 
 	grp = "TestGroupGetNil"
-	err = cache.AddGroup(grp, nil)
+	err = cache.AddGroup(grp, time.Hour, nil)
 	testy.NotOk(t, err)
 }
 
@@ -144,7 +144,7 @@ func TestGroupGet(t *testing.T) {
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	_, etag1, err := cache.Get(context.TODO(), grp, key, "")
@@ -174,7 +174,7 @@ func TestGroupMultiGet(t *testing.T) {
 	key := grp + "key"
 
 	a := &APITest2{}
-	err := cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	f1 := func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestStats(t *testing.T) {
 	val := key + "value"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, a)
+	err := cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	cache.Set(grp, key, []byte(val))
@@ -305,6 +305,43 @@ func TestStats(t *testing.T) {
 	testy.Equals(t, size, 0)
 }
 
+func TestExpires1(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestExpires1"
+	key := grp + "key"
+
+	a := &APITest1{}
+	err := cache.AddGroup(grp, time.Nanosecond, a)
+	testy.Ok(t, err)
+
+	_, _, _ = cache.Get(context.TODO(), grp, key, "")
+	time.Sleep(time.Nanosecond)
+	_, _, _ = cache.Get(context.TODO(), grp, key, "")
+
+	gets := cache.Stats().GetCalls
+	testy.Equals(t, gets, 2)
+}
+
+func TestExpires2(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestExpires2"
+	key := grp + "key"
+
+	a := &APITest1{}
+	err := cache.AddGroup(grp, time.Hour, a)
+	testy.Ok(t, err)
+
+	_, _, _ = cache.Get(context.TODO(), grp, key, "")
+	time.Sleep(time.Nanosecond)
+	_, _, _ = cache.Get(context.TODO(), grp, key, "")
+
+	gets := cache.Stats().GetCalls
+	testy.Equals(t, gets, 1)
+
+	hits := cache.Stats().CacheHits
+	testy.Equals(t, hits, 1)
+}
+
 var raceShardedCache = NewWebCache(10000, 8)
 
 func TestRace(t *testing.T) {
@@ -329,6 +366,16 @@ func TestRace(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func BenchmarkTimeNow(b *testing.B) {
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = time.Now()
+		}
+	})
 }
 
 func BenchmarkFnv(b *testing.B) {
@@ -420,7 +467,7 @@ func (g *profileGetter) Get(_ context.Context, _ string) ([]byte, error) {
 
 func BenchmarkForCPUProfileWebCache(b *testing.B) {
 	cache := NewWebCache(100000, 1)
-	_ = cache.AddGroup("group", &profileGetter{})
+	_ = cache.AddGroup("group", time.Hour, &profileGetter{})
 	var keys [1000]string
 	for i := 0; i < 1000; i++ {
 		keys[i] = strconv.FormatUint(uint64(i), 10)
@@ -440,7 +487,7 @@ func BenchmarkForCPUProfileWebCache(b *testing.B) {
 
 func BenchmarkForCPUProfileBucket(b *testing.B) {
 	cache := NewBucket(100000)
-	_ = cache.AddGroup("group", &profileGetter{})
+	_ = cache.AddGroup("group", time.Hour, &profileGetter{})
 	var keys [1000]string
 	for i := 0; i < 1000; i++ {
 		keys[i] = strconv.FormatUint(uint64(i), 10)

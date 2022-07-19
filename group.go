@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 )
 
 type getter interface {
@@ -23,15 +24,17 @@ type group struct {
 	getter getter
 	calls  map[string]*call
 	name   string
+	maxAge time.Duration
 }
 
-func newGroup(name string, getter getter) (*group, error) {
+func newGroup(name string, maxAge time.Duration, getter getter) (*group, error) {
 	if getter == nil {
 		return nil, errors.New("getter must not be nil")
 	}
 
 	return &group{
 		name:   name,
+		maxAge: maxAge,
 		getter: getter,
 	}, nil
 }

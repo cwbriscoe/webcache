@@ -17,9 +17,12 @@ import (
 	"github.com/cespare/xxhash/v2"
 )
 
+var defaultMaxAge = time.Hour * 24 * 365 * 100 // 100 years
+
 type cacheEntry struct {
-	elem *list.Element
-	etag string
+	elem    *list.Element
+	etag    string
+	expires time.Time
 }
 
 // Just an estimate
@@ -39,7 +42,7 @@ func (v *cacheValue) size() int64 {
 
 // Cacher is an interface for either an Bucket or WebCache
 type Cacher interface {
-	AddGroup(string, getter) error
+	AddGroup(string, time.Duration, getter) error
 	Delete(string, string)
 	Get(context.Context, string, string, string) ([]byte, string, error)
 	Set(string, string, []byte) string
@@ -80,7 +83,7 @@ func NewBucket(capacity int64) *Bucket {
 }
 
 // AddGroup adds a new cache group with a getter function
-func (c *Bucket) AddGroup(group string, getter getter) error {
+func (c *Bucket) AddGroup(group string, maxAge time.Duration, getter getter) error {
 	c.Lock()
 
 	_, ok := c.groups[group]
@@ -89,7 +92,7 @@ func (c *Bucket) AddGroup(group string, getter getter) error {
 		return errors.New(group + " cache group already exists")
 	}
 
-	grp, err := newGroup(group, getter)
+	grp, err := newGroup(group, maxAge, getter)
 	if err != nil {
 		return err
 	}
@@ -123,9 +126,14 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 	cacheKey := group + key
 	c.Lock()
 
-	// return if the etag matches the etag cache
 	ent, ok := c.entry[cacheKey]
 	if ok {
+		// first check if the entry has expired
+		if time.Now().After(ent.expires) {
+			c.deleteKey(cacheKey)
+			goto callGetter
+		}
+		// return if the etag matches the etag cache
 		if etag == ent.etag {
 			c.Unlock()
 			atomic.AddInt64(&c.stats.EtagHits, 1)
@@ -138,6 +146,8 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		atomic.AddInt64(&c.stats.CacheHits, 1)
 		return value, ent.etag, nil
 	}
+
+callGetter: // this label is used when old cache entry has expired
 
 	// no cache hit so call the do(key) function for the group
 	grp, ok := c.groups[group]
@@ -192,8 +202,15 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	hash.Write(value)
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
 
+	// get the maxAge for the given group.  if no group is found then it never expires
+	maxAge := defaultMaxAge
+	grp, ok := c.groups[group]
+	if ok {
+		maxAge = grp.maxAge
+	}
+
 	// store etag and link to the cache value in the key lookup map
-	e := &cacheEntry{elem: elem, etag: hashstr}
+	e := &cacheEntry{elem: elem, etag: hashstr, expires: time.Now().Add(maxAge)}
 	c.entry[cacheKey] = e
 	atomic.AddInt64(&c.stats.Size, v.size()+e.size())
 
