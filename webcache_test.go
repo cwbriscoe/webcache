@@ -292,7 +292,7 @@ func TestStats(t *testing.T) {
 	testy.Equals(t, hits, 1)
 
 	_, _, _ = cache.Get(context.TODO(), "", key+"1", etag)
-	misses := cache.Stats().Misses
+	misses := cache.Stats().GetMisses
 	testy.Equals(t, misses, 1)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key+"1", "")

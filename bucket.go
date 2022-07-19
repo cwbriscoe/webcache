@@ -52,7 +52,7 @@ type CacheStats struct {
 	GetCalls  int64
 	GetDupes  int64
 	GetErrors int64
-	Misses    int64
+	GetMisses int64
 	Capacity  int64
 	Size      int64
 }
@@ -131,44 +131,43 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 
 	// otherwise see if we get a cache hit
 	elt, ok := c.table[cacheKey]
-	if !ok {
-		// no cache hit so call the do(key) function for the group
-		grp, ok := c.groups[group]
+	if ok {
+		value := elt.Value.(*cacheValue).bytes
+		c.list.MoveToFront(elt)
 		c.Unlock()
-		if !ok {
-			atomic.AddInt64(&c.stats.Misses, 1)
-			return nil, "", nil
-		}
-		value, dupe, err := grp.do(ctx, key)
-		if err != nil {
-			atomic.AddInt64(&c.stats.GetErrors, 1)
-			return nil, "", err
-		}
-		// record a miss if the getter does not return bytes
-		if value == nil {
-			atomic.AddInt64(&c.stats.Misses, 1)
-		}
-		// now set the value from the do(key) call into the cache
-		var newEtag string
-		if !dupe {
-			newEtag = c.Set(group, key, value)
-			atomic.AddInt64(&c.stats.GetCalls, 1)
-		} else {
-			// try to get etag from etag cache for dupe threads on same do(key)
-			c.Lock()
-			newEtag = c.etags[cacheKey]
-			c.Unlock()
-			atomic.AddInt64(&c.stats.GetDupes, 1)
-		}
-		return value, newEtag, nil
+		atomic.AddInt64(&c.stats.CacheHits, 1)
+		return value, hash, nil
 	}
 
-	value := elt.Value.(*cacheValue).bytes
-	c.list.MoveToFront(elt)
+	// no cache hit so call the do(key) function for the group
+	grp, ok := c.groups[group]
 	c.Unlock()
-
-	atomic.AddInt64(&c.stats.CacheHits, 1)
-	return value, hash, nil
+	if !ok {
+		atomic.AddInt64(&c.stats.GetMisses, 1)
+		return nil, "", nil
+	}
+	value, dupe, err := grp.do(ctx, key)
+	if err != nil {
+		atomic.AddInt64(&c.stats.GetErrors, 1)
+		return nil, "", err
+	}
+	// record a miss if the getter does not return bytes
+	if value == nil {
+		atomic.AddInt64(&c.stats.GetMisses, 1)
+	}
+	// now set the value from the do(key) call into the cache
+	var newEtag string
+	if !dupe {
+		newEtag = c.Set(group, key, value)
+		atomic.AddInt64(&c.stats.GetCalls, 1)
+	} else {
+		// try to get etag from etag cache for dupe threads on same do(key)
+		c.Lock()
+		newEtag = c.etags[cacheKey]
+		c.Unlock()
+		atomic.AddInt64(&c.stats.GetDupes, 1)
+	}
+	return value, newEtag, nil
 }
 
 // Set inserts some {key, value} into the cache.
@@ -203,7 +202,7 @@ func (c *Bucket) Stats() *CacheStats {
 		GetCalls:  atomic.LoadInt64(&c.stats.GetCalls),
 		GetDupes:  atomic.LoadInt64(&c.stats.GetDupes),
 		GetErrors: atomic.LoadInt64(&c.stats.GetErrors),
-		Misses:    atomic.LoadInt64(&c.stats.Misses),
+		GetMisses: atomic.LoadInt64(&c.stats.GetMisses),
 		Capacity:  atomic.LoadInt64(&c.stats.Capacity),
 		Size:      atomic.LoadInt64(&c.stats.Size),
 	}
