@@ -12,9 +12,20 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 )
+
+type cacheEntry struct {
+	elem *list.Element
+	etag string
+}
+
+// Just an estimate
+func (v *cacheEntry) size() int64 {
+	return int64(8 + len(v.etag))
+}
 
 type cacheValue struct {
 	key   string
@@ -40,8 +51,7 @@ type Bucket struct {
 	sync.Mutex
 	list   *list.List
 	groups map[string]*group
-	table  map[string]*list.Element
-	etags  map[string]string
+	entry  map[string]*cacheEntry
 	stats  CacheStats
 }
 
@@ -63,8 +73,7 @@ func NewBucket(capacity int64) *Bucket {
 		stats:  CacheStats{},
 		list:   list.New(),
 		groups: make(map[string]*group),
-		table:  make(map[string]*list.Element),
-		etags:  make(map[string]string),
+		entry:  make(map[string]*cacheEntry),
 	}
 	bucket.stats.Capacity = capacity
 	return bucket
@@ -93,18 +102,11 @@ func (c *Bucket) AddGroup(group string, getter getter) error {
 // deleteKey will delete from the cache and etag map.
 // the mutex must be locked before calling this function.
 func (c *Bucket) deleteKey(key string) {
-	elt, ok := c.table[key]
+	ent, ok := c.entry[key]
 	if ok {
-		delete(c.table, key)
-		v := c.list.Remove(elt).(*cacheValue)
-		atomic.AddInt64(&c.stats.Size, -v.size())
-	}
-
-	// delete the etag
-	val, ok := c.etags[key]
-	if ok {
-		delete(c.etags, key)
-		atomic.AddInt64(&c.stats.Size, -int64(len(key)+len(val)))
+		delete(c.entry, key)
+		v := c.list.Remove(ent.elem).(*cacheValue)
+		atomic.AddInt64(&c.stats.Size, -v.size()-ent.size())
 	}
 }
 
@@ -122,21 +124,19 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 	c.Lock()
 
 	// return if the etag matches the etag cache
-	hash := c.etags[cacheKey]
-	if etag != "" && etag == hash {
-		c.Unlock()
-		atomic.AddInt64(&c.stats.EtagHits, 1)
-		return nil, etag, nil
-	}
-
-	// otherwise see if we get a cache hit
-	elt, ok := c.table[cacheKey]
+	ent, ok := c.entry[cacheKey]
 	if ok {
-		value := elt.Value.(*cacheValue).bytes
-		c.list.MoveToFront(elt)
+		if etag == ent.etag {
+			c.Unlock()
+			atomic.AddInt64(&c.stats.EtagHits, 1)
+			return nil, etag, nil
+		}
+		// otherwise return the cached value
+		value := ent.elem.Value.(*cacheValue).bytes
+		c.list.MoveToFront(ent.elem)
 		c.Unlock()
 		atomic.AddInt64(&c.stats.CacheHits, 1)
-		return value, hash, nil
+		return value, ent.etag, nil
 	}
 
 	// no cache hit so call the do(key) function for the group
@@ -161,9 +161,15 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		newEtag = c.Set(group, key, value)
 		atomic.AddInt64(&c.stats.GetCalls, 1)
 	} else {
-		// try to get etag from etag cache for dupe threads on same do(key)
+		// try to get etag from etag cache for dupe threads on same do(key).
+		// sleep very shortly to allow the do/getter thread time to call Set
+		// and update the cacheEntry with the etag.
+		time.Sleep(time.Millisecond)
 		c.Lock()
-		newEtag = c.etags[cacheKey]
+		elem, ok := c.entry[cacheKey]
+		if ok {
+			newEtag = elem.etag
+		}
 		c.Unlock()
 		atomic.AddInt64(&c.stats.GetDupes, 1)
 	}
@@ -177,17 +183,19 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 
 	c.deleteKey(cacheKey)
 
+	// store the cache value
 	v := &cacheValue{cacheKey, value}
-	elt := c.list.PushFront(v)
-	c.table[cacheKey] = elt
-	atomic.AddInt64(&c.stats.Size, v.size())
+	elem := c.list.PushFront(v)
 
-	// save the etag
+	// calculate the etag based of the hash sum of the data
 	hash := xxhash.New()
 	hash.Write(value)
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
-	c.etags[cacheKey] = hashstr
-	atomic.AddInt64(&c.stats.Size, int64(len(cacheKey)+len(hashstr)))
+
+	// store etag and link to the cache value in the key lookup map
+	e := &cacheEntry{elem: elem, etag: hashstr}
+	c.entry[cacheKey] = e
+	atomic.AddInt64(&c.stats.Size, v.size()+e.size())
 
 	c.trim()
 	c.Unlock()
@@ -218,7 +226,8 @@ func (c *Bucket) trim() {
 			break
 		}
 		v := c.list.Remove(elt).(*cacheValue)
-		delete(c.table, v.key)
-		c.stats.Size -= v.size()
+		elem := c.entry[v.key]
+		delete(c.entry, v.key)
+		c.stats.Size -= (elem.size() + v.size())
 	}
 }
