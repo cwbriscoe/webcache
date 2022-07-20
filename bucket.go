@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -26,19 +27,24 @@ type cacheEntry struct {
 	expires time.Time
 }
 
-// Just an estimate
-func (v *cacheEntry) size() int64 {
-	return int64(8 + len(v.etag))
-}
-
 type cacheValue struct {
 	key   string
 	bytes []byte
 }
 
+const (
+	cacheEntrySize = int(unsafe.Sizeof(cacheEntry{}))
+	cacheValueSize = int(unsafe.Sizeof(cacheValue{}))
+)
+
+// Just an estimate
+func (v *cacheEntry) size() int64 {
+	return int64(cacheEntrySize + len(v.etag))
+}
+
 // Just an estimate
 func (v *cacheValue) size() int64 {
-	return int64(len(v.key) + len(v.bytes))
+	return int64(cacheValueSize + len(v.key) + len(v.bytes))
 }
 
 // Cacher is an interface for either an Bucket or WebCache
