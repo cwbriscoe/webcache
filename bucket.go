@@ -17,7 +17,8 @@ import (
 	"github.com/cespare/xxhash/v2"
 )
 
-var defaultMaxAge = time.Hour * 24 * 365 * 100 // 100 years
+// NeverExpire is used to indicate that you want data in the specified group to never expire
+var NeverExpire = time.Hour*24*365*10 ^ 11 // about 100 billion years
 
 type cacheEntry struct {
 	elem    *list.Element
@@ -203,7 +204,7 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	hashstr := strconv.FormatUint(hash.Sum64(), 16)
 
 	// get the maxAge for the given group.  if no group is found then it never expires
-	maxAge := defaultMaxAge
+	maxAge := NeverExpire
 	grp, ok := c.groups[group]
 	if ok {
 		maxAge = grp.maxAge

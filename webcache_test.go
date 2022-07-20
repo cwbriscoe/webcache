@@ -328,7 +328,7 @@ func TestExpires2(t *testing.T) {
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err := cache.AddGroup(grp, NeverExpire, a)
 	testy.Ok(t, err)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
@@ -340,6 +340,27 @@ func TestExpires2(t *testing.T) {
 
 	hits := cache.Stats().CacheHits
 	testy.Equals(t, hits, 1)
+}
+
+func TestExpiresEtag(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestExpiresEtag"
+	key := grp + "key"
+
+	a := &APITest1{}
+	err := cache.AddGroup(grp, time.Nanosecond, a)
+	testy.Ok(t, err)
+
+	_, etag1, _ := cache.Get(context.TODO(), grp, key, "")
+	time.Sleep(time.Nanosecond)
+	_, etag2, _ := cache.Get(context.TODO(), grp, key, "")
+
+	gets := cache.Stats().GetCalls
+
+	testy.NotEquals(t, etag1, "")
+	testy.NotEquals(t, etag2, "")
+	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, gets, 2)
 }
 
 var raceShardedCache = NewWebCache(10000, 8)
