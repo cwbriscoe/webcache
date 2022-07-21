@@ -46,11 +46,11 @@ func TestSimpleSet(t *testing.T) {
 	key := "key"
 	val := "TestSimpleSet"
 
-	etag1 := cache.Set("", key, []byte(val))
-	getval, etag2, err := cache.Get(context.TODO(), "", key, "")
+	info1 := cache.Set("", key, []byte(val))
+	getval, info2, err := cache.Get(context.TODO(), "", key, "")
 
 	testy.Ok(t, err)
-	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, info1.Etag, info2.Etag)
 	testy.Equals(t, val, string(getval))
 }
 
@@ -60,11 +60,11 @@ func TestGroupSet(t *testing.T) {
 	key := grp + "key"
 	val := key + "value"
 
-	etag1 := cache.Set(grp, key, []byte(val))
-	getval, etag2, err := cache.Get(context.TODO(), grp, key, "")
+	info1 := cache.Set(grp, key, []byte(val))
+	getval, info2, err := cache.Get(context.TODO(), grp, key, "")
 
 	testy.Ok(t, err)
-	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, info1.Etag, info2.Etag)
 	testy.Equals(t, val, string(getval))
 }
 
@@ -147,12 +147,13 @@ func TestGroupGet(t *testing.T) {
 	err := cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
-	_, etag1, err := cache.Get(context.TODO(), grp, key, "")
+	_, info1, err := cache.Get(context.TODO(), grp, key, "")
 	testy.Ok(t, err)
 
-	getval, etag2, err := cache.Get(context.TODO(), grp, key, "")
+	getval, info2, err := cache.Get(context.TODO(), grp, key, "")
+
 	testy.Ok(t, err)
-	testy.Equals(t, etag1, etag2)
+	testy.Equals(t, info1.Etag, info2.Etag)
 	testy.NotNil(t, getval)
 }
 
@@ -213,11 +214,12 @@ func TestGroupGetWrongKey(t *testing.T) {
 	key := grp + "key"
 	val := key + "value"
 
-	etag1 := cache.Set(grp, key, []byte(val))
-	getval, etag2, err := cache.Get(context.TODO(), grp, "notkey", "")
+	info1 := cache.Set(grp, key, []byte(val))
+	getval, info2, err := cache.Get(context.TODO(), grp, "notkey", "")
 
 	testy.Ok(t, err)
-	testy.NotEquals(t, etag1, etag2)
+	testy.Assert(t, info1 != nil, "expected info2 to not be nil")
+	testy.Assert(t, info2 == nil, "expected info2 to be nil")
 	testy.Nil(t, getval)
 }
 

@@ -191,7 +191,9 @@ callGetter: // this label is used when old cache entry has expired
 	} else {
 		// try to get etag from etag cache for dupe threads on same do(key).
 		// sleep very shortly to allow the do/getter thread time to call Set
-		// and update the cacheEntry with the etag.
+		// and update the cacheEntry with the etag.  without the sleep, a dupe
+		// thread would rarely read the entry map before the getter thread
+		// put the values in the cache.
 		time.Sleep(time.Millisecond)
 		c.Lock()
 		elem, ok := c.entry[cacheKey]
@@ -216,9 +218,7 @@ func (c *Bucket) Set(group string, key string, value []byte) *CacheInfo {
 	elem := c.list.PushFront(v)
 
 	// calculate the etag based of the hash sum of the data
-	hash := xxhash.New()
-	hash.Write(value)
-	hashstr := strconv.FormatUint(hash.Sum64(), 16)
+	hashstr := strconv.FormatUint(xxhash.Sum64(value), 16)
 
 	// get the maxAge for the given group.  if no group is found then it never expires
 	maxAge := NeverExpire
