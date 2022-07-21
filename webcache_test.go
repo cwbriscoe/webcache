@@ -81,14 +81,14 @@ func TestSimpleGetWrongKey(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
-	cache := createWebCache(t, 250, 1)
-	if cache.Stats().Capacity != 250 {
-		t.Errorf("Expected capacity to be %d, but got '%d'", 250, cache.Stats().Capacity)
+	cache := createWebCache(t, 300, 1)
+	if cache.Stats().Capacity != 300 {
+		t.Errorf("Expected capacity to be %d, but got '%d'", 300, cache.Stats().Capacity)
 	}
 	key := "key"
 	val := "0123456789"
 
-	baseSize := cacheValueSize + cacheEntrySize + len(key) + len(val)
+	baseSize := cacheValueSize + cacheEntrySize + cacheInfoSize + len(key) + len(val)
 
 	etag := cache.Set("", key, []byte(val))
 	esz := int64(baseSize + len(etag))

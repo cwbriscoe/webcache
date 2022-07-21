@@ -21,10 +21,17 @@ import (
 // NeverExpire is used to indicate that you want data in the specified group to never expire
 var NeverExpire = time.Hour*24*365*10 ^ 11 // about 100 billion years
 
+// CacheInfo stores the etag of the cache entry, when it expires and the cost in time that
+// the getter function took to create the content
+type CacheInfo struct {
+	Etag    string
+	Expires time.Time
+	Cost    time.Duration
+}
+
 type cacheEntry struct {
-	elem    *list.Element
-	etag    string
-	expires time.Time
+	elem *list.Element
+	info *CacheInfo
 }
 
 type cacheValue struct {
@@ -33,13 +40,14 @@ type cacheValue struct {
 }
 
 const (
+	cacheInfoSize  = int(unsafe.Sizeof(CacheInfo{}))
 	cacheEntrySize = int(unsafe.Sizeof(cacheEntry{}))
 	cacheValueSize = int(unsafe.Sizeof(cacheValue{}))
 )
 
 // Just an estimate
 func (v *cacheEntry) size() int64 {
-	return int64(cacheEntrySize + len(v.etag))
+	return int64(cacheEntrySize + cacheInfoSize + len(v.info.Etag))
 }
 
 // Just an estimate
@@ -136,22 +144,22 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 	ent, ok := c.entry[cacheKey]
 	if ok {
 		// first check if the entry has expired
-		if time.Now().After(ent.expires) {
+		if time.Now().After(ent.info.Expires) {
 			c.deleteKey(cacheKey)
 			goto callGetter
 		}
 		// return if the etag matches the etag cache
-		if etag == ent.etag {
+		if etag == ent.info.Etag {
 			c.Unlock()
 			atomic.AddInt64(&c.stats.EtagHits, 1)
-			return nil, etag, nil
+			return nil, ent.info.Etag, nil
 		}
 		// otherwise return the cached value
 		value := ent.elem.Value.(*cacheValue).bytes
 		c.list.MoveToFront(ent.elem)
 		c.Unlock()
 		atomic.AddInt64(&c.stats.CacheHits, 1)
-		return value, ent.etag, nil
+		return value, ent.info.Etag, nil
 	}
 
 callGetter: // this label is used when old cache entry has expired
@@ -185,7 +193,7 @@ callGetter: // this label is used when old cache entry has expired
 		c.Lock()
 		elem, ok := c.entry[cacheKey]
 		if ok {
-			newEtag = elem.etag
+			newEtag = elem.info.Etag
 		}
 		c.Unlock()
 		atomic.AddInt64(&c.stats.GetDupes, 1)
@@ -217,7 +225,13 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	}
 
 	// store etag and link to the cache value in the key lookup map
-	e := &cacheEntry{elem: elem, etag: hashstr, expires: time.Now().Add(maxAge)}
+	e := &cacheEntry{
+		elem: elem,
+		info: &CacheInfo{
+			Etag:    hashstr,
+			Expires: time.Now().Add(maxAge),
+		},
+	}
 	c.entry[cacheKey] = e
 	atomic.AddInt64(&c.stats.Size, v.size()+e.size())
 
