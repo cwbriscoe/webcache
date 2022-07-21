@@ -55,12 +55,12 @@ func (c *WebCache) Delete(group string, key string) {
 }
 
 // Get retrieves a value from the WebCache and returns value and etag
-func (c *WebCache) Get(ctx context.Context, group string, key string, etag string) ([]byte, string, error) {
+func (c *WebCache) Get(ctx context.Context, group string, key string, etag string) ([]byte, *CacheInfo, error) {
 	return c.cache[c.getShard(key)].Get(ctx, group, key, etag)
 }
 
 // Set inserts some {key, value} into the WebCache.
-func (c *WebCache) Set(group string, key string, value []byte) string {
+func (c *WebCache) Set(group string, key string, value []byte) *CacheInfo {
 	return c.cache[c.getShard(key)].Set(group, key, value)
 }
 

@@ -90,8 +90,8 @@ func TestTrim(t *testing.T) {
 
 	baseSize := cacheValueSize + cacheEntrySize + cacheInfoSize + len(key) + len(val)
 
-	etag := cache.Set("", key, []byte(val))
-	esz := int64(baseSize + len(etag))
+	info := cache.Set("", key, []byte(val))
+	esz := int64(baseSize + len(info.Etag))
 	sz := cache.Stats().Size
 	testy.Equals(t, sz, esz)
 
@@ -242,10 +242,12 @@ func TestGroupDelete(t *testing.T) {
 
 	cache.Set(grp, key, []byte(val))
 	cache.Delete(grp, key)
-	getval, etag, err := cache.Get(context.TODO(), grp, key, "")
+	getval, info, err := cache.Get(context.TODO(), grp, key, "")
+
+	t.Log(info)
 
 	testy.Ok(t, err)
-	testy.Equals(t, etag, "")
+	testy.Assert(t, info == nil, "info should be nil")
 	testy.Nil(t, getval)
 }
 
@@ -282,16 +284,16 @@ func TestStats(t *testing.T) {
 	size = cache.Stats().Size
 	testy.Equals(t, size, 0)
 
-	etag := cache.Set(grp, key, []byte(val))
+	info := cache.Set(grp, key, []byte(val))
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
 	hits := cache.Stats().CacheHits
 	testy.Equals(t, hits, 1)
 
-	_, _, _ = cache.Get(context.TODO(), grp, key, etag)
+	_, _, _ = cache.Get(context.TODO(), grp, key, info.Etag)
 	hits = cache.Stats().EtagHits
 	testy.Equals(t, hits, 1)
 
-	_, _, _ = cache.Get(context.TODO(), "", key+"1", etag)
+	_, _, _ = cache.Get(context.TODO(), "", key+"1", info.Etag)
 	misses := cache.Stats().GetMisses
 	testy.Equals(t, misses, 1)
 
@@ -351,15 +353,15 @@ func TestExpiresEtag(t *testing.T) {
 	err := cache.AddGroup(grp, time.Nanosecond, a)
 	testy.Ok(t, err)
 
-	_, etag1, _ := cache.Get(context.TODO(), grp, key, "")
+	_, info1, _ := cache.Get(context.TODO(), grp, key, "")
 	time.Sleep(time.Nanosecond)
-	_, etag2, _ := cache.Get(context.TODO(), grp, key, "")
+	_, info2, _ := cache.Get(context.TODO(), grp, key, "")
 
 	gets := cache.Stats().GetCalls
 
-	testy.NotEquals(t, etag1, "")
-	testy.NotEquals(t, etag2, "")
-	testy.Equals(t, etag1, etag2)
+	testy.NotEquals(t, info1.Etag, "")
+	testy.NotEquals(t, info2.Etag, "")
+	testy.Equals(t, info1.Etag, info2.Etag)
 	testy.Equals(t, gets, 2)
 }
 

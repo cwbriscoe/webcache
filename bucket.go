@@ -59,8 +59,8 @@ func (v *cacheValue) size() int64 {
 type Cacher interface {
 	AddGroup(string, time.Duration, getter) error
 	Delete(string, string)
-	Get(context.Context, string, string, string) ([]byte, string, error)
-	Set(string, string, []byte) string
+	Get(context.Context, string, string, string) ([]byte, *CacheInfo, error)
+	Set(string, string, []byte) *CacheInfo
 	Stats() *CacheStats
 }
 
@@ -137,7 +137,7 @@ func (c *Bucket) Delete(group string, key string) {
 }
 
 // Get retrieves a value from the cache or nil if no value present.
-func (c *Bucket) Get(ctx context.Context, group string, key string, etag string) ([]byte, string, error) {
+func (c *Bucket) Get(ctx context.Context, group string, key string, etag string) ([]byte, *CacheInfo, error) {
 	cacheKey := group + key
 	c.Lock()
 
@@ -152,14 +152,14 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		if etag == ent.info.Etag {
 			c.Unlock()
 			atomic.AddInt64(&c.stats.EtagHits, 1)
-			return nil, ent.info.Etag, nil
+			return nil, ent.info, nil
 		}
 		// otherwise return the cached value
 		value := ent.elem.Value.(*cacheValue).bytes
 		c.list.MoveToFront(ent.elem)
 		c.Unlock()
 		atomic.AddInt64(&c.stats.CacheHits, 1)
-		return value, ent.info.Etag, nil
+		return value, ent.info, nil
 	}
 
 callGetter: // this label is used when old cache entry has expired
@@ -169,21 +169,24 @@ callGetter: // this label is used when old cache entry has expired
 	c.Unlock()
 	if !ok {
 		atomic.AddInt64(&c.stats.GetMisses, 1)
-		return nil, "", nil
+		return nil, nil, nil
 	}
+	start := time.Now()
 	value, dupe, err := grp.do(ctx, key)
+	elapsed := time.Since(start)
 	if err != nil {
 		atomic.AddInt64(&c.stats.GetErrors, 1)
-		return nil, "", err
+		return nil, nil, err
 	}
 	// record a miss if the getter does not return bytes
 	if value == nil {
 		atomic.AddInt64(&c.stats.GetMisses, 1)
 	}
 	// now set the value from the do(key) call into the cache
-	var newEtag string
+	var info *CacheInfo
 	if !dupe {
-		newEtag = c.Set(group, key, value)
+		info = c.Set(group, key, value)
+		info.Cost = elapsed
 		atomic.AddInt64(&c.stats.GetCalls, 1)
 	} else {
 		// try to get etag from etag cache for dupe threads on same do(key).
@@ -193,16 +196,16 @@ callGetter: // this label is used when old cache entry has expired
 		c.Lock()
 		elem, ok := c.entry[cacheKey]
 		if ok {
-			newEtag = elem.info.Etag
+			info = elem.info
 		}
 		c.Unlock()
 		atomic.AddInt64(&c.stats.GetDupes, 1)
 	}
-	return value, newEtag, nil
+	return value, info, nil
 }
 
 // Set inserts some {key, value} into the cache.
-func (c *Bucket) Set(group string, key string, value []byte) string {
+func (c *Bucket) Set(group string, key string, value []byte) *CacheInfo {
 	cacheKey := group + key
 	c.Lock()
 
@@ -225,19 +228,19 @@ func (c *Bucket) Set(group string, key string, value []byte) string {
 	}
 
 	// store etag and link to the cache value in the key lookup map
-	e := &cacheEntry{
+	ent := &cacheEntry{
 		elem: elem,
 		info: &CacheInfo{
 			Etag:    hashstr,
 			Expires: time.Now().Add(maxAge),
 		},
 	}
-	c.entry[cacheKey] = e
-	atomic.AddInt64(&c.stats.Size, v.size()+e.size())
+	c.entry[cacheKey] = ent
+	atomic.AddInt64(&c.stats.Size, v.size()+ent.size())
 
 	c.trim()
 	c.Unlock()
-	return hashstr
+	return ent.info
 }
 
 // Stats returns statistics about this Bucket
