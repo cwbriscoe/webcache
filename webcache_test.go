@@ -530,13 +530,42 @@ func BenchmarkForCPUProfileBucket(b *testing.B) {
 	})
 }
 
-func BenchmarkRealSharded1x(b *testing.B)    { benchmarkRealSharded(b, 1) }
-func BenchmarkRealNotSharded1x(b *testing.B) { benchmarkRealNotSharded(b, 1) }
-func BenchmarkRealSharded2x(b *testing.B)    { benchmarkRealSharded(b, 2) }
-func BenchmarkRealNotSharded2x(b *testing.B) { benchmarkRealNotSharded(b, 2) }
-func BenchmarkRealSharded3x(b *testing.B)    { benchmarkRealSharded(b, 3) }
-func BenchmarkRealNotSharded3x(b *testing.B) { benchmarkRealNotSharded(b, 3) }
-func BenchmarkRealSharded4x(b *testing.B)    { benchmarkRealSharded(b, 4) }
-func BenchmarkRealNotSharded4x(b *testing.B) { benchmarkRealNotSharded(b, 4) }
-func BenchmarkRealSharded5x(b *testing.B)    { benchmarkRealSharded(b, 5) }
-func BenchmarkRealNotSharded5x(b *testing.B) { benchmarkRealNotSharded(b, 5) }
+func BenchmarkRealSharded1x(b *testing.B) {
+	benchmarkRealSharded(b, 1)
+}
+
+func BenchmarkRealNotSharded1x(b *testing.B) {
+	benchmarkRealNotSharded(b, 1)
+}
+
+func BenchmarkRealSharded2x(b *testing.B) {
+	benchmarkRealSharded(b, 2)
+}
+
+func BenchmarkRealNotSharded2x(b *testing.B) {
+	benchmarkRealNotSharded(b, 2)
+}
+
+func BenchmarkRealSharded3x(b *testing.B) {
+	benchmarkRealSharded(b, 3)
+}
+
+func BenchmarkRealNotSharded3x(b *testing.B) {
+	benchmarkRealNotSharded(b, 3)
+}
+
+func BenchmarkRealSharded4x(b *testing.B) {
+	benchmarkRealSharded(b, 4)
+}
+
+func BenchmarkRealNotSharded4x(b *testing.B) {
+	benchmarkRealNotSharded(b, 4)
+}
+
+func BenchmarkRealSharded5x(b *testing.B) {
+	benchmarkRealSharded(b, 5)
+}
+
+func BenchmarkRealNotSharded5x(b *testing.B) {
+	benchmarkRealNotSharded(b, 5)
+}
