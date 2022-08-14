@@ -185,8 +185,7 @@ callGetter: // this label is used when old cache entry has expired
 	// now set the value from the do(key) call into the cache
 	var info *CacheInfo
 	if !dupe {
-		info = c.Set(group, key, value)
-		info.Cost = elapsed
+		info = c.internalSet(group, key, value, elapsed)
 		atomic.AddInt64(&c.stats.GetCalls, 1)
 	} else {
 		// try to get etag from etag cache for dupe threads on same do(key).
@@ -207,7 +206,11 @@ callGetter: // this label is used when old cache entry has expired
 }
 
 // Set inserts some {key, value} into the cache.
-func (c *Bucket) Set(group string, key string, value []byte) *CacheInfo {
+func (c *Bucket) Set(group, key string, value []byte) *CacheInfo {
+	return c.internalSet(group, key, value, time.Duration(0))
+}
+
+func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Duration) *CacheInfo {
 	cacheKey := group + key
 	c.Lock()
 
@@ -233,8 +236,10 @@ func (c *Bucket) Set(group string, key string, value []byte) *CacheInfo {
 		info: &CacheInfo{
 			Etag:    hashstr,
 			Expires: time.Now().Add(maxAge),
+			Cost:    elapsed,
 		},
 	}
+
 	c.entry[cacheKey] = ent
 	atomic.AddInt64(&c.stats.Size, v.size()+ent.size())
 

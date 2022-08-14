@@ -393,6 +393,43 @@ func TestRace(t *testing.T) {
 	wg.Wait()
 }
 
+// Test a race that happened when accessing CacheInfo during single flight
+type APIRaceTestCacheInfo struct{}
+
+func (*APIRaceTestCacheInfo) Get(_ context.Context, key string) ([]byte, error) {
+	if len(key) == 1 {
+		return nil, errors.New("Invalid key: " + key)
+	}
+
+	value := key + key + key + key + key
+	return []byte(value), nil
+}
+
+func TestRaceCacheInfo(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestRaceTestCacheInfo"
+	key := grp + "key"
+
+	a := &APIRaceTestCacheInfo{}
+	err := cache.AddGroup(grp, time.Hour, a)
+	testy.Ok(t, err)
+
+	f1 := func(t *testing.T) {
+		t.Parallel()
+		_, info, err := cache.Get(context.TODO(), grp, key, "")
+		testy.NotNil(t, info)
+		testy.Ok(t, err)
+		val := info.Cost.String()
+		testy.NotNil(t, val)
+	}
+
+	t.Run("RaceTestCacheInfo", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			t.Run(strconv.FormatInt(int64(i), 10), f1)
+		}
+	})
+}
+
 func BenchmarkTimeNow(b *testing.B) {
 	b.ResetTimer()
 
@@ -504,8 +541,8 @@ func BenchmarkForCPUProfileWebCache(b *testing.B) {
 			random := rand.Intn(1000)
 			_, _, _ = cache.Get(context.TODO(), "group", keys[random], "")
 			// not necessary to add a call to Set() since Get calls it often
-			random = rand.Intn(1000)
-			cache.Delete("group", keys[random])
+			// random = rand.Intn(1000)
+			// cache.Delete("group", keys[random])
 		}
 	})
 }
