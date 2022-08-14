@@ -36,16 +36,13 @@ func newGroup(name string, maxAge time.Duration, getter getter) (*group, error) 
 		name:   name,
 		maxAge: maxAge,
 		getter: getter,
+		calls:  make(map[string]*call),
 	}, nil
 }
 
-// do ensures fn() is called only once per group key
+// do ensures fn() is called only once per group key (singleflight)
 func (g *group) do(ctx context.Context, key string) ([]byte, bool, error) {
 	g.Lock()
-
-	if g.calls == nil {
-		g.calls = make(map[string]*call)
-	}
 
 	if c, ok := g.calls[key]; ok {
 		g.Unlock()
