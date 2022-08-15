@@ -208,6 +208,37 @@ func TestGroupMultiGet(t *testing.T) {
 	testy.Equals(t, stats.GetErrors, 10)
 }
 
+type PanicTest struct{}
+
+func (*PanicTest) Get(_ context.Context, _ string) ([]byte, error) {
+	time.Sleep(100 * time.Millisecond)
+	panic("oh no, something bad happened")
+}
+
+func TestPanicInGetter(t *testing.T) {
+	cache := createWebCache(t, 10000, 8)
+	grp := "TestPanicInGetter"
+	key := grp + "key"
+
+	a := &PanicTest{}
+	err := cache.AddGroup(grp, time.Hour, a)
+	testy.Ok(t, err)
+
+	f1 := func(t *testing.T) {
+		t.Parallel()
+		_, _, _ = cache.Get(context.TODO(), grp, key, "")
+	}
+
+	t.Run("group1", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			t.Run(strconv.FormatInt(int64(i), 10), f1)
+		}
+	})
+
+	stats := cache.Stats()
+	testy.Equals(t, stats.GetErrors, 10)
+}
+
 func TestGroupGetWrongKey(t *testing.T) {
 	cache := createWebCache(t, 10000, 8)
 	grp := "TestGroupGetWrongKey"

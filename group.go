@@ -5,6 +5,7 @@ package webcache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -40,8 +41,8 @@ func newGroup(name string, maxAge time.Duration, getter getter) (*group, error) 
 	}, nil
 }
 
-// do ensures fn() is called only once per group key (singleflight)
-func (g *group) do(ctx context.Context, key string) ([]byte, bool, error) {
+// do ensures fn() is called only once per group key (singleflight).
+func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error) {
 	g.Lock()
 
 	if c, ok := g.calls[key]; ok {
@@ -52,8 +53,25 @@ func (g *group) do(ctx context.Context, key string) ([]byte, bool, error) {
 
 	c := new(call)
 	c.Add(1)
+
 	g.calls[key] = c
 	g.Unlock()
+
+	// setup recovery in case the getter function panics.
+	defer func() {
+		if i := recover(); i != nil {
+			c.val = []byte("")
+			c.err = fmt.Errorf(
+				"panic(recovered): (group:'%s',key:'%s') error:\n%v", g.name, key, i,
+			)
+			err = c.err
+
+			c.Done()
+			g.Lock()
+			delete(g.calls, key)
+			g.Unlock()
+		}
+	}()
 
 	c.val, c.err = g.getter.Get(ctx, key)
 	c.Done()
