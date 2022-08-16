@@ -51,7 +51,7 @@ func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error
 		return call.val, true, call.err
 	}
 
-	call := new(call)
+	call := &call{}
 	call.Add(1)
 
 	g.calls[key] = call

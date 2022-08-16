@@ -129,7 +129,7 @@ func (c *Bucket) deleteKey(key string) {
 }
 
 // Delete the value indicated by the key, if it is present.
-func (c *Bucket) Delete(group string, key string) {
+func (c *Bucket) Delete(group, key string) {
 	cacheKey := group + key
 	c.Lock()
 	c.deleteKey(cacheKey)
@@ -137,7 +137,7 @@ func (c *Bucket) Delete(group string, key string) {
 }
 
 // Get retrieves a value from the cache or nil if no value present.
-func (c *Bucket) Get(ctx context.Context, group string, key string, etag string) ([]byte, *CacheInfo, error) {
+func (c *Bucket) Get(ctx context.Context, group, key, etag string) ([]byte, *CacheInfo, error) {
 	cacheKey := group + key
 	c.Lock()
 
@@ -146,23 +146,20 @@ func (c *Bucket) Get(ctx context.Context, group string, key string, etag string)
 		// first check if the entry has expired
 		if time.Now().After(ent.info.Expires) {
 			c.deleteKey(cacheKey)
-			goto callGetter
-		}
-		// return if the etag matches the etag cache
-		if etag == ent.info.Etag {
+		} else if etag == ent.info.Etag {
+			// return if the etag matches the etag cache
 			c.Unlock()
 			atomic.AddInt64(&c.stats.EtagHits, 1)
 			return nil, ent.info, nil
+		} else {
+			// otherwise return the cached value
+			value := ent.elem.Value.(*cacheValue).bytes
+			c.list.MoveToFront(ent.elem)
+			c.Unlock()
+			atomic.AddInt64(&c.stats.CacheHits, 1)
+			return value, ent.info, nil
 		}
-		// otherwise return the cached value
-		value := ent.elem.Value.(*cacheValue).bytes
-		c.list.MoveToFront(ent.elem)
-		c.Unlock()
-		atomic.AddInt64(&c.stats.CacheHits, 1)
-		return value, ent.info, nil
 	}
-
-callGetter: // this label is used when old cache entry has expired
 
 	// no cache hit so call the do(key) function for the group
 	grp, ok := c.groups[group]
@@ -171,6 +168,11 @@ callGetter: // this label is used when old cache entry has expired
 		atomic.AddInt64(&c.stats.GetMisses, 1)
 		return nil, nil, nil
 	}
+
+	return c.singleFlight(ctx, group, key, grp)
+}
+
+func (c *Bucket) singleFlight(ctx context.Context, group, key string, grp *group) ([]byte, *CacheInfo, error) {
 	start := time.Now()
 	value, dupe, err := grp.do(ctx, key)
 	elapsed := time.Since(start)
@@ -194,7 +196,7 @@ callGetter: // this label is used when old cache entry has expired
 	} else {
 		// try to get info struct from the info cache.
 		c.Lock()
-		elem, ok := c.entry[cacheKey]
+		elem, ok := c.entry[group+key]
 		if ok {
 			info = elem.info
 		}
