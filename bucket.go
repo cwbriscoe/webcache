@@ -175,6 +175,9 @@ callGetter: // this label is used when old cache entry has expired
 	value, dupe, err := grp.do(ctx, key)
 	elapsed := time.Since(start)
 	if err != nil {
+		if !dupe {
+			grp.finish(key)
+		}
 		atomic.AddInt64(&c.stats.GetErrors, 1)
 		return nil, nil, err
 	}
@@ -186,14 +189,10 @@ callGetter: // this label is used when old cache entry has expired
 	var info *CacheInfo
 	if !dupe {
 		info = c.internalSet(group, key, value, elapsed)
+		grp.finish(key)
 		atomic.AddInt64(&c.stats.GetCalls, 1)
 	} else {
-		// try to get etag from etag cache for dupe threads on same do(key).
-		// sleep very shortly to allow the do/getter thread time to call Set
-		// and update the cacheEntry with the etag.  without the sleep, a dupe
-		// thread would rarely read the entry map before the getter thread
-		// put the values in the cache.
-		time.Sleep(time.Millisecond)
+		// try to get info struct from the info cache.
 		c.Lock()
 		elem, ok := c.entry[cacheKey]
 		if ok {

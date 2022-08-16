@@ -45,40 +45,38 @@ func newGroup(name string, maxAge time.Duration, getter getter) (*group, error) 
 func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error) {
 	g.Lock()
 
-	if c, ok := g.calls[key]; ok {
+	if call, ok := g.calls[key]; ok {
 		g.Unlock()
-		c.Wait()
-		return c.val, true, c.err
+		call.Wait()
+		return call.val, true, call.err
 	}
 
-	c := new(call)
-	c.Add(1)
+	call := new(call)
+	call.Add(1)
 
-	g.calls[key] = c
+	g.calls[key] = call
 	g.Unlock()
 
 	// setup recovery in case the getter function panics.
 	defer func() {
 		if i := recover(); i != nil {
-			c.val = []byte("")
-			c.err = fmt.Errorf(
+			call.val = []byte("")
+			call.err = fmt.Errorf(
 				"panic(recovered): (group:'%s',key:'%s') error:\n%v", g.name, key, i,
 			)
-			err = c.err
-
-			c.Done()
-			g.Lock()
-			delete(g.calls, key)
-			g.Unlock()
+			err = call.err
 		}
 	}()
 
-	c.val, c.err = g.getter.Get(ctx, key)
-	c.Done()
+	call.val, call.err = g.getter.Get(ctx, key)
 
+	return call.val, false, call.err
+}
+
+func (g *group) finish(key string) {
 	g.Lock()
+	call := g.calls[key]
+	call.Done()
 	delete(g.calls, key)
 	g.Unlock()
-
-	return c.val, false, c.err
 }
