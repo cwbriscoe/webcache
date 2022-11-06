@@ -267,14 +267,21 @@ func (c *Bucket) Stats() *CacheStats {
 // capacity. Note that this method is not threadsafe (it should only be called from other methods which
 // already hold the lock).
 func (c *Bucket) trim() {
-	for c.stats.Size > c.stats.Capacity {
+	sz := atomic.LoadInt64(&c.stats.Size)
+	cp := atomic.LoadInt64(&c.stats.Capacity)
+
+	for sz > cp {
 		elt := c.list.Back()
 		if elt == nil {
 			break
 		}
+
 		v := c.list.Remove(elt).(*cacheValue)
 		elem := c.entry[v.key]
 		delete(c.entry, v.key)
-		c.stats.Size -= (elem.size() + v.size())
+
+		eltSize := elem.size() + v.size()
+		sz -= eltSize
+		atomic.AddInt64(&c.stats.Size, -eltSize)
 	}
 }
