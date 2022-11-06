@@ -81,6 +81,15 @@ func (c *WebCache) Stats() *CacheStats {
 	return stats
 }
 
+// BucketStats returns statistics about all buckets
+func (c *WebCache) BucketStats() []*CacheStats {
+	stats := make([]*CacheStats, c.buckets)
+	for i := 0; i < c.buckets; i++ {
+		stats[i] = c.cache[i].Stats()
+	}
+	return stats
+}
+
 func (c *WebCache) getShard(key string) uint64 {
 	hash := xxhash.New()
 	hash.Write([]byte(key))
