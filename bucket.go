@@ -75,14 +75,16 @@ type Bucket struct {
 
 // CacheStats keeps track of cache statistics
 type CacheStats struct {
-	EtagHits  int64
-	CacheHits int64
-	GetCalls  int64
-	GetDupes  int64
-	GetErrors int64
-	GetMisses int64
-	Capacity  int64
-	Size      int64
+	EtagHits    int64
+	CacheHits   int64
+	GetCalls    int64
+	GetDupes    int64
+	GetErrors   int64
+	GetMisses   int64
+	TrimEntries int64
+	TrimBytes   int64
+	Capacity    int64
+	Size        int64
 }
 
 // NewBucket creates a new Cache with a maximum size of capacity bytes.
@@ -252,14 +254,16 @@ func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Durat
 // Stats returns statistics about this Bucket
 func (c *Bucket) Stats() *CacheStats {
 	return &CacheStats{
-		EtagHits:  atomic.LoadInt64(&c.stats.EtagHits),
-		CacheHits: atomic.LoadInt64(&c.stats.CacheHits),
-		GetCalls:  atomic.LoadInt64(&c.stats.GetCalls),
-		GetDupes:  atomic.LoadInt64(&c.stats.GetDupes),
-		GetErrors: atomic.LoadInt64(&c.stats.GetErrors),
-		GetMisses: atomic.LoadInt64(&c.stats.GetMisses),
-		Capacity:  atomic.LoadInt64(&c.stats.Capacity),
-		Size:      atomic.LoadInt64(&c.stats.Size),
+		EtagHits:    atomic.LoadInt64(&c.stats.EtagHits),
+		CacheHits:   atomic.LoadInt64(&c.stats.CacheHits),
+		GetCalls:    atomic.LoadInt64(&c.stats.GetCalls),
+		GetDupes:    atomic.LoadInt64(&c.stats.GetDupes),
+		GetErrors:   atomic.LoadInt64(&c.stats.GetErrors),
+		GetMisses:   atomic.LoadInt64(&c.stats.GetMisses),
+		TrimEntries: atomic.LoadInt64(&c.stats.TrimEntries),
+		TrimBytes:   atomic.LoadInt64(&c.stats.TrimBytes),
+		Capacity:    atomic.LoadInt64(&c.stats.Capacity),
+		Size:        atomic.LoadInt64(&c.stats.Size),
 	}
 }
 
@@ -283,5 +287,7 @@ func (c *Bucket) trim() {
 		eltSize := elem.size() + v.size()
 		sz -= eltSize
 		atomic.AddInt64(&c.stats.Size, -eltSize)
+		atomic.AddInt64(&c.stats.TrimEntries, 1)
+		atomic.AddInt64(&c.stats.TrimBytes, eltSize)
 	}
 }

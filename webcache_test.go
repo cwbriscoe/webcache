@@ -103,8 +103,10 @@ func TestTrim(t *testing.T) {
 
 	key = "def"
 	cache.Set("", key, []byte(val))
-	sz = cache.Stats().Size
-	testy.Equals(t, sz, esz)
+	stats := cache.Stats()
+	testy.Equals(t, stats.Size, esz)
+	testy.Equals(t, stats.TrimEntries, 1)
+	testy.Equals(t, stats.TrimBytes, esz/2)
 }
 
 func TestTrimOverflow(t *testing.T) {
