@@ -1,4 +1,4 @@
-// Copyright 2020 - 2022 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 - 2023 Christopher Briscoe.  All rights reserved.
 
 // Package webcache is A simple LRU cache for storing documents ([]byte). When the size maximum is reached,
 // items are evicted starting with the least recently used. This data structure is goroutine-safe (it has
@@ -75,16 +75,16 @@ type Bucket struct {
 
 // CacheStats keeps track of cache statistics
 type CacheStats struct {
-	EtagHits    int64
-	CacheHits   int64
-	GetCalls    int64
-	GetDupes    int64
-	GetErrors   int64
-	GetMisses   int64
-	TrimEntries int64
-	TrimBytes   int64
-	Capacity    int64
-	Size        int64
+	EtagHits    atomic.Int64
+	CacheHits   atomic.Int64
+	GetCalls    atomic.Int64
+	GetDupes    atomic.Int64
+	GetErrors   atomic.Int64
+	GetMisses   atomic.Int64
+	TrimEntries atomic.Int64
+	TrimBytes   atomic.Int64
+	Capacity    atomic.Int64
+	Size        atomic.Int64
 }
 
 // NewBucket creates a new Cache with a maximum size of capacity bytes.
@@ -95,7 +95,7 @@ func NewBucket(capacity int64) *Bucket {
 		groups: make(map[string]*group),
 		entry:  make(map[string]*cacheEntry),
 	}
-	bucket.stats.Capacity = capacity
+	bucket.stats.Capacity.Store(capacity)
 	return bucket
 }
 
@@ -126,7 +126,7 @@ func (c *Bucket) deleteKey(key string) {
 	if ok {
 		delete(c.entry, key)
 		v := c.list.Remove(ent.elem).(*cacheValue)
-		atomic.AddInt64(&c.stats.Size, -v.size()-ent.size())
+		c.stats.Size.Add(-v.size() - ent.size())
 	}
 }
 
@@ -151,14 +151,14 @@ func (c *Bucket) Get(ctx context.Context, group, key, etag string) ([]byte, *Cac
 		} else if etag == ent.info.Etag {
 			// return if the etag matches the etag cache
 			c.Unlock()
-			atomic.AddInt64(&c.stats.EtagHits, 1)
+			c.stats.EtagHits.Add(1)
 			return nil, ent.info, nil
 		} else {
 			// otherwise return the cached value
 			value := ent.elem.Value.(*cacheValue).bytes
 			c.list.MoveToFront(ent.elem)
 			c.Unlock()
-			atomic.AddInt64(&c.stats.CacheHits, 1)
+			c.stats.CacheHits.Add(1)
 			return value, ent.info, nil
 		}
 	}
@@ -167,7 +167,7 @@ func (c *Bucket) Get(ctx context.Context, group, key, etag string) ([]byte, *Cac
 	grp, ok := c.groups[group]
 	c.Unlock()
 	if !ok {
-		atomic.AddInt64(&c.stats.GetMisses, 1)
+		c.stats.GetMisses.Add(1)
 		return nil, nil, nil
 	}
 
@@ -182,19 +182,19 @@ func (c *Bucket) singleFlight(ctx context.Context, group, key string, grp *group
 		if !dupe {
 			grp.finish(key)
 		}
-		atomic.AddInt64(&c.stats.GetErrors, 1)
+		c.stats.GetErrors.Add(1)
 		return nil, nil, err
 	}
 	// record a miss if the getter does not return bytes
 	if value == nil {
-		atomic.AddInt64(&c.stats.GetMisses, 1)
+		c.stats.GetMisses.Add(1)
 	}
 	// now set the value from the do(key) call into the cache
 	var info *CacheInfo
 	if !dupe {
 		info = c.internalSet(group, key, value, elapsed)
 		grp.finish(key)
-		atomic.AddInt64(&c.stats.GetCalls, 1)
+		c.stats.GetCalls.Add(1)
 	} else {
 		// try to get info struct from the info cache.
 		c.Lock()
@@ -203,7 +203,7 @@ func (c *Bucket) singleFlight(ctx context.Context, group, key string, grp *group
 			info = elem.info
 		}
 		c.Unlock()
-		atomic.AddInt64(&c.stats.GetDupes, 1)
+		c.stats.GetDupes.Add(1)
 	}
 	return value, info, nil
 }
@@ -244,7 +244,7 @@ func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Durat
 	}
 
 	c.entry[cacheKey] = ent
-	atomic.AddInt64(&c.stats.Size, v.size()+ent.size())
+	c.stats.Size.Add(v.size() + ent.size())
 
 	c.trim()
 	c.Unlock()
@@ -253,26 +253,26 @@ func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Durat
 
 // Stats returns statistics about this Bucket
 func (c *Bucket) Stats() *CacheStats {
-	return &CacheStats{
-		EtagHits:    atomic.LoadInt64(&c.stats.EtagHits),
-		CacheHits:   atomic.LoadInt64(&c.stats.CacheHits),
-		GetCalls:    atomic.LoadInt64(&c.stats.GetCalls),
-		GetDupes:    atomic.LoadInt64(&c.stats.GetDupes),
-		GetErrors:   atomic.LoadInt64(&c.stats.GetErrors),
-		GetMisses:   atomic.LoadInt64(&c.stats.GetMisses),
-		TrimEntries: atomic.LoadInt64(&c.stats.TrimEntries),
-		TrimBytes:   atomic.LoadInt64(&c.stats.TrimBytes),
-		Capacity:    atomic.LoadInt64(&c.stats.Capacity),
-		Size:        atomic.LoadInt64(&c.stats.Size),
-	}
+	stats := &CacheStats{}
+	stats.EtagHits.Store(c.stats.EtagHits.Load())
+	stats.CacheHits.Store(c.stats.CacheHits.Load())
+	stats.GetCalls.Store(c.stats.GetCalls.Load())
+	stats.GetDupes.Store(c.stats.GetDupes.Load())
+	stats.GetErrors.Store(c.stats.GetErrors.Load())
+	stats.GetMisses.Store(c.stats.GetMisses.Load())
+	stats.TrimEntries.Store(c.stats.TrimEntries.Load())
+	stats.TrimBytes.Store(c.stats.TrimBytes.Load())
+	stats.Capacity.Store(c.stats.Capacity.Load())
+	stats.Size.Store(c.stats.Size.Load())
+	return stats
 }
 
 // If the cache is over capacity, clear elements (starting at the end of the list) until it is back under
 // capacity. Note that this method is not threadsafe (it should only be called from other methods which
 // already hold the lock).
 func (c *Bucket) trim() {
-	sz := atomic.LoadInt64(&c.stats.Size)
-	cp := atomic.LoadInt64(&c.stats.Capacity)
+	sz := c.stats.Size.Load()
+	cp := c.stats.Capacity.Load()
 
 	for sz > cp {
 		elt := c.list.Back()
@@ -286,8 +286,8 @@ func (c *Bucket) trim() {
 
 		eltSize := elem.size() + v.size()
 		sz -= eltSize
-		atomic.AddInt64(&c.stats.Size, -eltSize)
-		atomic.AddInt64(&c.stats.TrimEntries, 1)
-		atomic.AddInt64(&c.stats.TrimBytes, eltSize)
+		c.stats.Size.Add(-eltSize)
+		c.stats.TrimEntries.Add(1)
+		c.stats.TrimBytes.Add(eltSize)
 	}
 }

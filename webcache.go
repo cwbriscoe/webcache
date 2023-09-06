@@ -1,4 +1,4 @@
-// Copyright 2020 - 2022 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 - 2023 Christopher Briscoe.  All rights reserved.
 
 package webcache
 
@@ -69,16 +69,16 @@ func (c *WebCache) Stats() *CacheStats {
 	stats := &CacheStats{}
 	for i := 0; i < c.buckets; i++ {
 		bucketStats := c.cache[i].Stats()
-		stats.EtagHits += bucketStats.EtagHits
-		stats.CacheHits += bucketStats.CacheHits
-		stats.GetCalls += bucketStats.GetCalls
-		stats.GetDupes += bucketStats.GetDupes
-		stats.GetErrors += bucketStats.GetErrors
-		stats.GetMisses += bucketStats.GetMisses
-		stats.TrimEntries += bucketStats.TrimEntries
-		stats.TrimBytes += bucketStats.TrimBytes
-		stats.Capacity += bucketStats.Capacity
-		stats.Size += bucketStats.Size
+		stats.EtagHits.Add(bucketStats.EtagHits.Load())
+		stats.CacheHits.Add(bucketStats.CacheHits.Load())
+		stats.GetCalls.Add(bucketStats.GetCalls.Load())
+		stats.GetDupes.Add(bucketStats.GetDupes.Load())
+		stats.GetErrors.Add(bucketStats.GetErrors.Load())
+		stats.GetMisses.Add(bucketStats.GetMisses.Load())
+		stats.TrimEntries.Add(bucketStats.TrimEntries.Load())
+		stats.TrimBytes.Add(bucketStats.TrimBytes.Load())
+		stats.Capacity.Add(bucketStats.Capacity.Load())
+		stats.Size.Add(bucketStats.Size.Load())
 	}
 	return stats
 }

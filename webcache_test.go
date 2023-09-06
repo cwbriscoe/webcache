@@ -1,4 +1,4 @@
-// Copyright 2020 - 2022 Christopher Briscoe.  All rights reserved.
+// Copyright 2020 - 2023 Christopher Briscoe.  All rights reserved.
 
 package webcache
 
@@ -82,8 +82,8 @@ func TestSimpleGetWrongKey(t *testing.T) {
 
 func TestTrim(t *testing.T) {
 	cache := createWebCache(t, 300, 1)
-	if cache.Stats().Capacity != 300 {
-		t.Errorf("Expected capacity to be %d, but got '%d'", 300, cache.Stats().Capacity)
+	if cache.Stats().Capacity.Load() != 300 {
+		t.Errorf("Expected capacity to be %d, but got '%d'", 300, cache.Stats().Capacity.Load())
 	}
 	key := "key"
 	val := "0123456789"
@@ -92,21 +92,21 @@ func TestTrim(t *testing.T) {
 
 	info := cache.Set("", key, []byte(val))
 	esz := int64(baseSize + len(info.Etag))
-	sz := cache.Stats().Size
+	sz := cache.Stats().Size.Load()
 	testy.Equals(t, sz, esz)
 
 	key = "abc"
 	cache.Set("", key, []byte(val))
 	esz *= 2
-	sz = cache.Stats().Size
+	sz = cache.Stats().Size.Load()
 	testy.Equals(t, sz, esz)
 
 	key = "def"
 	cache.Set("", key, []byte(val))
 	stats := cache.Stats()
-	testy.Equals(t, stats.Size, esz)
-	testy.Equals(t, stats.TrimEntries, 1)
-	testy.Equals(t, stats.TrimBytes, esz/2)
+	testy.Equals(t, stats.Size.Load(), esz)
+	testy.Equals(t, stats.TrimEntries.Load(), 1)
+	testy.Equals(t, stats.TrimBytes.Load(), esz/2)
 }
 
 func TestTrimOverflow(t *testing.T) {
@@ -205,9 +205,9 @@ func TestGroupMultiGet(t *testing.T) {
 	})
 
 	stats := cache.Stats()
-	testy.Equals(t, stats.GetCalls, 1)
-	testy.Equals(t, stats.GetDupes, 9)
-	testy.Equals(t, stats.GetErrors, 10)
+	testy.Equals(t, stats.GetCalls.Load(), 1)
+	testy.Equals(t, stats.GetDupes.Load(), 9)
+	testy.Equals(t, stats.GetErrors.Load(), 10)
 }
 
 type PanicTest struct{}
@@ -238,7 +238,7 @@ func TestPanicInGetter(t *testing.T) {
 	})
 
 	stats := cache.Stats()
-	testy.Equals(t, stats.GetErrors, 10)
+	testy.Equals(t, stats.GetErrors.Load(), 10)
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
@@ -308,7 +308,7 @@ func TestStats(t *testing.T) {
 	cache.Delete(grp, key+"3")
 	cache.Delete(grp, key+"4")
 	cache.Delete(grp, key+"5")
-	size := cache.Stats().Size
+	size := cache.Stats().Size.Load()
 	if size != 0 {
 		t.Errorf("Expected Size to be zero: %d", size)
 	}
@@ -316,29 +316,29 @@ func TestStats(t *testing.T) {
 	cache.Set(grp, key, []byte(val))
 	cache.Set(grp, key, []byte(val+val))
 	cache.Delete(grp, key)
-	size = cache.Stats().Size
+	size = cache.Stats().Size.Load()
 	testy.Equals(t, size, 0)
 
 	info := cache.Set(grp, key, []byte(val))
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
-	hits := cache.Stats().CacheHits
+	hits := cache.Stats().CacheHits.Load()
 	testy.Equals(t, hits, 1)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key, info.Etag)
-	hits = cache.Stats().EtagHits
+	hits = cache.Stats().EtagHits.Load()
 	testy.Equals(t, hits, 1)
 
 	_, _, _ = cache.Get(context.TODO(), "", key+"1", info.Etag)
-	misses := cache.Stats().GetMisses
+	misses := cache.Stats().GetMisses.Load()
 	testy.Equals(t, misses, 1)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key+"1", "")
-	calls := cache.Stats().GetCalls
+	calls := cache.Stats().GetCalls.Load()
 	testy.Equals(t, calls, 1)
 
 	cache.Delete(grp, key)
 	cache.Delete(grp, key+"1")
-	size = cache.Stats().Size
+	size = cache.Stats().Size.Load()
 	testy.Equals(t, size, 0)
 }
 
@@ -355,7 +355,7 @@ func TestExpires1(t *testing.T) {
 	time.Sleep(time.Nanosecond)
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
 
-	gets := cache.Stats().GetCalls
+	gets := cache.Stats().GetCalls.Load()
 	testy.Equals(t, gets, 2)
 }
 
@@ -372,10 +372,10 @@ func TestExpires2(t *testing.T) {
 	time.Sleep(time.Nanosecond)
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
 
-	gets := cache.Stats().GetCalls
+	gets := cache.Stats().GetCalls.Load()
 	testy.Equals(t, gets, 1)
 
-	hits := cache.Stats().CacheHits
+	hits := cache.Stats().CacheHits.Load()
 	testy.Equals(t, hits, 1)
 }
 
@@ -392,7 +392,7 @@ func TestExpiresEtag(t *testing.T) {
 	time.Sleep(time.Nanosecond)
 	_, info2, _ := cache.Get(context.TODO(), grp, key, "")
 
-	gets := cache.Stats().GetCalls
+	gets := cache.Stats().GetCalls.Load()
 
 	testy.NotEquals(t, info1.Etag, "")
 	testy.NotEquals(t, info2.Etag, "")
