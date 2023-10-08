@@ -19,8 +19,8 @@ import (
 	"github.com/cwbriscoe/testy"
 )
 
-func createWebCache(t *testing.T, capacity int64, buckets int) Cacher {
-	cache := NewWebCache(capacity, buckets)
+func createWebCache(t *testing.T, config *Config) Cacher {
+	cache := NewWebCache(config)
 	if cache == nil {
 		t.Errorf("NewWebCache() returned null")
 	}
@@ -28,21 +28,21 @@ func createWebCache(t *testing.T, capacity int64, buckets int) Cacher {
 }
 
 func TestBucketCount(t *testing.T) {
-	cache := NewWebCache(10000, 0)
+	cache := NewWebCache(&Config{Capacity: 10000, Buckets: 0})
 	testy.Equals(t, cache.buckets, defaultBuckets)
 
-	cache = NewWebCache(10000, 999)
+	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 999})
 	testy.Equals(t, cache.buckets, defaultBuckets)
 
-	cache = NewWebCache(10000, 1)
+	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 1})
 	testy.Equals(t, cache.buckets, 1)
 
-	cache = NewWebCache(10000, 2)
+	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 2})
 	testy.Equals(t, cache.buckets, 2)
 }
 
 func TestSimpleSet(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	key := "key"
 	val := "TestSimpleSet"
 
@@ -55,7 +55,7 @@ func TestSimpleSet(t *testing.T) {
 }
 
 func TestGroupSet(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupSet"
 	key := grp + "key"
 	val := key + "value"
@@ -69,7 +69,7 @@ func TestGroupSet(t *testing.T) {
 }
 
 func TestSimpleGetWrongKey(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	key := "key"
 	val := "value"
 
@@ -81,7 +81,7 @@ func TestSimpleGetWrongKey(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
-	cache := createWebCache(t, 300, 1)
+	cache := createWebCache(t, &Config{Capacity: 300, Buckets: 1})
 	if cache.Stats().Capacity.Load() != 300 {
 		t.Errorf("Expected capacity to be %d, but got '%d'", 300, cache.Stats().Capacity.Load())
 	}
@@ -110,7 +110,7 @@ func TestTrim(t *testing.T) {
 }
 
 func TestTrimOverflow(t *testing.T) {
-	cache := createWebCache(t, 10, 1)
+	cache := createWebCache(t, &Config{Capacity: 10, Buckets: 1})
 	key := "key"
 	val := "0123456789ABCDEF"
 
@@ -125,7 +125,7 @@ func (*APITest1) Get(_ context.Context, key string) ([]byte, error) {
 }
 
 func TestGroupAdd(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupGet"
 
 	a := &APITest1{}
@@ -141,7 +141,7 @@ func TestGroupAdd(t *testing.T) {
 }
 
 func TestGroupGet(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupGet"
 	key := grp + "key"
 
@@ -172,7 +172,7 @@ func (*APITest2) Get(_ context.Context, key string) ([]byte, error) {
 }
 
 func TestGroupMultiGet(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupGet"
 	key := grp + "key"
 
@@ -218,7 +218,7 @@ func (*PanicTest) Get(_ context.Context, _ string) ([]byte, error) {
 }
 
 func TestPanicInGetter(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestPanicInGetter"
 	key := grp + "key"
 
@@ -242,7 +242,7 @@ func TestPanicInGetter(t *testing.T) {
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupGetWrongKey"
 	key := grp + "key"
 	val := key + "value"
@@ -257,7 +257,7 @@ func TestGroupGetWrongKey(t *testing.T) {
 }
 
 func TestSimpleDelete(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	key := "key"
 	val := "value"
 
@@ -270,7 +270,7 @@ func TestSimpleDelete(t *testing.T) {
 }
 
 func TestGroupDelete(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestGroupDelete"
 	key := grp + "key"
 	val := key + "value"
@@ -287,7 +287,7 @@ func TestGroupDelete(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestStats"
 	key := grp + "key"
 	val := key + "value"
@@ -343,7 +343,7 @@ func TestStats(t *testing.T) {
 }
 
 func TestExpires1(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestExpires1"
 	key := grp + "key"
 
@@ -360,7 +360,7 @@ func TestExpires1(t *testing.T) {
 }
 
 func TestExpires2(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestExpires2"
 	key := grp + "key"
 
@@ -380,7 +380,7 @@ func TestExpires2(t *testing.T) {
 }
 
 func TestExpiresEtag(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestExpiresEtag"
 	key := grp + "key"
 
@@ -400,7 +400,7 @@ func TestExpiresEtag(t *testing.T) {
 	testy.Equals(t, gets, 2)
 }
 
-var raceShardedCache = NewWebCache(10000, 8)
+var raceShardedCache = NewWebCache(&Config{Capacity: 10000, Buckets: 8})
 
 func TestRace(t *testing.T) {
 	var wg sync.WaitGroup
@@ -439,7 +439,7 @@ func (*APIRaceTestCacheInfo) Get(_ context.Context, key string) ([]byte, error) 
 }
 
 func TestRaceCacheInfo(t *testing.T) {
-	cache := createWebCache(t, 10000, 8)
+	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	grp := "TestRaceTestCacheInfo"
 	key := grp + "key"
 
@@ -508,7 +508,7 @@ func BenchmarkXXHash(b *testing.B) {
 }
 
 func benchmarkRealSharded(b *testing.B, ratio int) {
-	cache := NewWebCache(2000000, 24)
+	cache := NewWebCache(&Config{Capacity: 10000, Buckets: 24})
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -561,7 +561,7 @@ func (g *profileGetter) Get(_ context.Context, _ string) ([]byte, error) {
 }
 
 func BenchmarkForCPUProfileWebCache(b *testing.B) {
-	cache := NewWebCache(100000, 1)
+	cache := NewWebCache(&Config{Capacity: 10000, Buckets: 1})
 	_ = cache.AddGroup("group", time.Hour, &profileGetter{})
 	var keys [1000]string
 	for i := 0; i < 1000; i++ {

@@ -17,22 +17,28 @@ type WebCache struct {
 	buckets int
 }
 
+// Config contains values to construct a NewWebCache
+type Config struct {
+	Capacity int64 `json:"capacity"`
+	Buckets  int   `json:"buckets"`
+}
+
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.
-func NewWebCache(capacity int64, buckets int) *WebCache {
+func NewWebCache(config *Config) *WebCache {
 	// buckets must be between 1 and 256
-	if buckets <= 0 || buckets > 256 {
-		buckets = defaultBuckets
+	if config.Buckets <= 0 || config.Buckets > 256 {
+		config.Buckets = defaultBuckets
 	}
 
 	webCache := &WebCache{
-		buckets: buckets,
+		buckets: config.Buckets,
 	}
 
-	webCache.cache = make([]*Bucket, buckets)
+	webCache.cache = make([]*Bucket, config.Buckets)
 
 	// create the shards/buckets
-	for i := 0; i < buckets; i++ {
-		webCache.cache[i] = NewBucket(capacity / int64(buckets))
+	for i := 0; i < config.Buckets; i++ {
+		webCache.cache[i] = NewBucket(config.Capacity / int64(config.Buckets))
 	}
 
 	return webCache
