@@ -24,21 +24,21 @@ type Config struct {
 }
 
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.
-func NewWebCache(config *Config) *WebCache {
+func NewWebCache(cfg *Config) *WebCache {
 	// buckets must be between 1 and 256
-	if config.Buckets <= 0 || config.Buckets > 256 {
-		config.Buckets = defaultBuckets
+	if cfg.Buckets <= 0 || cfg.Buckets > 256 {
+		cfg.Buckets = defaultBuckets
 	}
 
 	webCache := &WebCache{
-		buckets: config.Buckets,
+		buckets: cfg.Buckets,
 	}
 
-	webCache.cache = make([]*Bucket, config.Buckets)
+	webCache.cache = make([]*Bucket, cfg.Buckets)
 
 	// create the shards/buckets
-	for i := 0; i < config.Buckets; i++ {
-		webCache.cache[i] = NewBucket(config.Capacity / int64(config.Buckets))
+	for i := 0; i < cfg.Buckets; i++ {
+		webCache.cache[i] = NewBucket(cfg.Capacity / int64(cfg.Buckets))
 	}
 
 	return webCache
