@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-type getter interface {
+// Getter defines an interface for retrieving emptty cache contents
+type Getter interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 }
 
@@ -22,13 +23,13 @@ type call struct {
 
 type group struct {
 	sync.Mutex
-	getter getter
+	getter Getter
 	calls  map[string]*call
 	name   string
 	maxAge time.Duration
 }
 
-func newGroup(name string, maxAge time.Duration, getter getter) (*group, error) {
+func newGroup(name string, maxAge time.Duration, getter Getter) (*group, error) {
 	if getter == nil {
 		return nil, errors.New("getter must not be nil")
 	}

@@ -45,7 +45,7 @@ func NewWebCache(cfg *Config) *WebCache {
 }
 
 // AddGroup adds a new cache group with a getter function
-func (c *WebCache) AddGroup(group string, maxAge time.Duration, getter getter) error {
+func (c *WebCache) AddGroup(group string, maxAge time.Duration, getter Getter) error {
 	for i := 0; i < c.buckets; i++ {
 		err := c.cache[i].AddGroup(group, maxAge, getter)
 		if err != nil {

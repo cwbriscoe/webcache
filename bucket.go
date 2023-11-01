@@ -57,7 +57,7 @@ func (v *cacheValue) size() int64 {
 
 // Cacher is an interface for either an Bucket or WebCache
 type Cacher interface {
-	AddGroup(string, time.Duration, getter) error
+	AddGroup(string, time.Duration, Getter) error
 	Delete(string, string)
 	Get(context.Context, string, string, string) ([]byte, *CacheInfo, error)
 	Set(string, string, []byte) *CacheInfo
@@ -100,7 +100,7 @@ func NewBucket(capacity int64) *Bucket {
 }
 
 // AddGroup adds a new cache group with a getter function
-func (c *Bucket) AddGroup(group string, maxAge time.Duration, getter getter) error {
+func (c *Bucket) AddGroup(group string, maxAge time.Duration, getter Getter) error {
 	c.Lock()
 
 	_, ok := c.groups[group]
