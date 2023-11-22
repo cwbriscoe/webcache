@@ -18,22 +18,27 @@ import (
 	"github.com/cespare/xxhash/v2"
 )
 
-// NeverExpire is used to indicate that you want data in the specified group to never expire
+// NeverExpire is used to indicate that you want data in the specified group to never expire.
+// It's set to a very large duration to represent "never expire".
 var NeverExpire = time.Hour*24*365*10 ^ 11 // about 100 billion years
 
 // CacheInfo stores the etag of the cache entry, when it expires and the cost in time that
-// the getter function took to create the content
+// the getter function took to create the content.
 type CacheInfo struct {
-	Etag    string
 	Expires time.Time
 	Cost    time.Duration
+	Etag    string
 }
 
+// cacheEntry represents a single entry in the cache.
+// It includes a pointer to the element in the LRU list and a pointer to its CacheInfo.
 type cacheEntry struct {
 	elem *list.Element
 	info *CacheInfo
 }
 
+// cacheValue represents the value of a cache entry.
+// It includes the key and the byte slice of the value.
 type cacheValue struct {
 	key   string
 	bytes []byte
@@ -45,18 +50,20 @@ const (
 	cacheValueSize = int(unsafe.Sizeof(cacheValue{}))
 )
 
-// Just an estimate
+// size returns an estimate of the memory usage of the cacheEntry.
+// It's an estimate because it doesn't account for memory fragmentation or allocator overhead.
 func (v *cacheEntry) size() int64 {
 	return int64(cacheEntrySize + cacheInfoSize + len(v.info.Etag))
 }
 
-// Just an estimate
+// size returns an estimate of the memory usage of the cacheValue.
+// It's an estimate because it doesn't account for memory fragmentation or allocator overhead.
 func (v *cacheValue) size() int64 {
 	return int64(cacheValueSize + len(v.key) + len(v.bytes))
 }
 
-// Cacher is an interface for either an Bucket or WebCache
-type Cacher interface {
+// CacheManager is an interface for either a Bucket or WebCache
+type CacheManager interface {
 	AddGroup(string, time.Duration, Getter) error
 	Delete(string, string)
 	Get(context.Context, string, string, string) ([]byte, *CacheInfo, error)
@@ -66,11 +73,11 @@ type Cacher interface {
 
 // Bucket is a simple LRU cache with Etag support
 type Bucket struct {
-	sync.Mutex
 	list   *list.List
 	groups map[string]*group
 	entry  map[string]*cacheEntry
 	stats  CacheStats
+	sync.Mutex
 }
 
 // CacheStats keeps track of cache statistics
@@ -132,7 +139,7 @@ func (c *Bucket) deleteKey(key string) {
 
 // Delete the value indicated by the key, if it is present.
 func (c *Bucket) Delete(group, key string) {
-	cacheKey := group + key
+	cacheKey := group + ":" + key
 	c.Lock()
 	c.deleteKey(cacheKey)
 	c.Unlock()
@@ -140,7 +147,7 @@ func (c *Bucket) Delete(group, key string) {
 
 // Get retrieves a value from the cache or nil if no value present.
 func (c *Bucket) Get(ctx context.Context, group, key, etag string) ([]byte, *CacheInfo, error) {
-	cacheKey := group + key
+	cacheKey := group + ":" + key
 	c.Lock()
 
 	ent, ok := c.entry[cacheKey]
@@ -197,8 +204,9 @@ func (c *Bucket) singleFlight(ctx context.Context, group, key string, grp *group
 		c.stats.GetCalls.Add(1)
 	} else {
 		// try to get info struct from the info cache.
+		cacheKey := group + ":" + key
 		c.Lock()
-		elem, ok := c.entry[group+key]
+		elem, ok := c.entry[cacheKey]
 		if ok {
 			info = elem.info
 		}
@@ -214,7 +222,7 @@ func (c *Bucket) Set(group, key string, value []byte) *CacheInfo {
 }
 
 func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Duration) *CacheInfo {
-	cacheKey := group + key
+	cacheKey := group + ":" + key
 	c.Lock()
 
 	c.deleteKey(cacheKey)

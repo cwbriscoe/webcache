@@ -5,6 +5,7 @@ package webcache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"hash/fnv"
 	"math/rand"
 	"runtime"
@@ -19,30 +20,37 @@ import (
 	"github.com/cwbriscoe/testy"
 )
 
-func createWebCache(t *testing.T, config *Config) Cacher {
+func createWebCache(t *testing.T, config *Config) (CacheManager, error) {
 	cache := NewWebCache(config)
 	if cache == nil {
 		t.Errorf("NewWebCache() returned null")
+		return nil, errors.New("NewWebCache returned null")
 	}
-	return cache
+	return cache, nil
 }
 
 func TestBucketCount(t *testing.T) {
-	cache := NewWebCache(&Config{Capacity: 10000, Buckets: 0})
-	testy.Equals(t, cache.buckets, defaultBuckets)
+	testCases := []struct {
+		capacity int64
+		buckets  int
+		expected int
+	}{
+		{10000, 0, defaultBuckets},
+		{10000, 999, defaultBuckets},
+		{10000, 1, 1},
+		{10000, 2, 2},
+	}
 
-	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 999})
-	testy.Equals(t, cache.buckets, defaultBuckets)
-
-	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 1})
-	testy.Equals(t, cache.buckets, 1)
-
-	cache = NewWebCache(&Config{Capacity: 10000, Buckets: 2})
-	testy.Equals(t, cache.buckets, 2)
+	for _, tc := range testCases {
+		cache := NewWebCache(&Config{Capacity: tc.capacity, Buckets: tc.buckets})
+		testy.NotNil(t, cache)
+		testy.Equals(t, cache.buckets, tc.expected)
+	}
 }
 
 func TestSimpleSet(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	key := "key"
 	val := "TestSimpleSet"
 
@@ -55,7 +63,8 @@ func TestSimpleSet(t *testing.T) {
 }
 
 func TestGroupSet(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupSet"
 	key := grp + "key"
 	val := key + "value"
@@ -69,7 +78,8 @@ func TestGroupSet(t *testing.T) {
 }
 
 func TestSimpleGetWrongKey(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	key := "key"
 	val := "value"
 
@@ -81,14 +91,16 @@ func TestSimpleGetWrongKey(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 300, Buckets: 1})
-	if cache.Stats().Capacity.Load() != 300 {
-		t.Errorf("Expected capacity to be %d, but got '%d'", 300, cache.Stats().Capacity.Load())
+	cache, err := createWebCache(t, &Config{Capacity: 400, Buckets: 1})
+	testy.Ok(t, err)
+	if cache.Stats().Capacity.Load() != 400 {
+		t.Errorf("Expected capacity to be %d, but got '%d'", 400, cache.Stats().Capacity.Load())
 	}
 	key := "key"
 	val := "0123456789"
 
 	baseSize := cacheValueSize + cacheEntrySize + cacheInfoSize + len(key) + len(val)
+	baseSize += 1 // size of ":" in key:value cache key
 
 	info := cache.Set("", key, []byte(val))
 	esz := int64(baseSize + len(info.Etag))
@@ -110,7 +122,8 @@ func TestTrim(t *testing.T) {
 }
 
 func TestTrimOverflow(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10, Buckets: 1})
+	cache, err := createWebCache(t, &Config{Capacity: 10, Buckets: 1})
+	testy.Ok(t, err)
 	key := "key"
 	val := "0123456789ABCDEF"
 
@@ -125,11 +138,12 @@ func (*APITest1) Get(_ context.Context, key string) ([]byte, error) {
 }
 
 func TestGroupAdd(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupGet"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	err = cache.AddGroup(grp, time.Hour, a)
@@ -141,12 +155,13 @@ func TestGroupAdd(t *testing.T) {
 }
 
 func TestGroupGet(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupGet"
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	_, info1, err := cache.Get(context.TODO(), grp, key, "")
@@ -172,12 +187,13 @@ func (*APITest2) Get(_ context.Context, key string) ([]byte, error) {
 }
 
 func TestGroupMultiGet(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupGet"
 	key := grp + "key"
 
 	a := &APITest2{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	f1 := func(t *testing.T) {
@@ -218,12 +234,13 @@ func (*PanicTest) Get(_ context.Context, _ string) ([]byte, error) {
 }
 
 func TestPanicInGetter(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestPanicInGetter"
 	key := grp + "key"
 
 	a := &PanicTest{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	f1 := func(t *testing.T) {
@@ -242,7 +259,8 @@ func TestPanicInGetter(t *testing.T) {
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupGetWrongKey"
 	key := grp + "key"
 	val := key + "value"
@@ -257,7 +275,8 @@ func TestGroupGetWrongKey(t *testing.T) {
 }
 
 func TestSimpleDelete(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	key := "key"
 	val := "value"
 
@@ -270,7 +289,8 @@ func TestSimpleDelete(t *testing.T) {
 }
 
 func TestGroupDelete(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestGroupDelete"
 	key := grp + "key"
 	val := key + "value"
@@ -287,13 +307,14 @@ func TestGroupDelete(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestStats"
 	key := grp + "key"
 	val := key + "value"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	cache.Set(grp, key, []byte(val))
@@ -343,12 +364,13 @@ func TestStats(t *testing.T) {
 }
 
 func TestExpires1(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestExpires1"
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Nanosecond, a)
+	err = cache.AddGroup(grp, time.Nanosecond, a)
 	testy.Ok(t, err)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
@@ -360,12 +382,13 @@ func TestExpires1(t *testing.T) {
 }
 
 func TestExpires2(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestExpires2"
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, NeverExpire, a)
+	err = cache.AddGroup(grp, NeverExpire, a)
 	testy.Ok(t, err)
 
 	_, _, _ = cache.Get(context.TODO(), grp, key, "")
@@ -380,12 +403,13 @@ func TestExpires2(t *testing.T) {
 }
 
 func TestExpiresEtag(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestExpiresEtag"
 	key := grp + "key"
 
 	a := &APITest1{}
-	err := cache.AddGroup(grp, time.Nanosecond, a)
+	err = cache.AddGroup(grp, time.Nanosecond, a)
 	testy.Ok(t, err)
 
 	_, info1, _ := cache.Get(context.TODO(), grp, key, "")
@@ -430,7 +454,7 @@ func TestRace(t *testing.T) {
 type APIRaceTestCacheInfo struct{}
 
 func (*APIRaceTestCacheInfo) Get(_ context.Context, key string) ([]byte, error) {
-	if len(key) == 1 {
+	if len(key) == 0 {
 		return nil, errors.New("Invalid key: " + key)
 	}
 
@@ -439,12 +463,13 @@ func (*APIRaceTestCacheInfo) Get(_ context.Context, key string) ([]byte, error) 
 }
 
 func TestRaceCacheInfo(t *testing.T) {
-	cache := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
 	grp := "TestRaceTestCacheInfo"
 	key := grp + "key"
 
 	a := &APIRaceTestCacheInfo{}
-	err := cache.AddGroup(grp, time.Hour, a)
+	err = cache.AddGroup(grp, time.Hour, a)
 	testy.Ok(t, err)
 
 	f1 := func(t *testing.T) {
@@ -600,42 +625,13 @@ func BenchmarkForCPUProfileBucket(b *testing.B) {
 	})
 }
 
-func BenchmarkRealSharded1x(b *testing.B) {
-	benchmarkRealSharded(b, 1)
-}
-
-func BenchmarkRealNotSharded1x(b *testing.B) {
-	benchmarkRealNotSharded(b, 1)
-}
-
-func BenchmarkRealSharded2x(b *testing.B) {
-	benchmarkRealSharded(b, 2)
-}
-
-func BenchmarkRealNotSharded2x(b *testing.B) {
-	benchmarkRealNotSharded(b, 2)
-}
-
-func BenchmarkRealSharded3x(b *testing.B) {
-	benchmarkRealSharded(b, 3)
-}
-
-func BenchmarkRealNotSharded3x(b *testing.B) {
-	benchmarkRealNotSharded(b, 3)
-}
-
-func BenchmarkRealSharded4x(b *testing.B) {
-	benchmarkRealSharded(b, 4)
-}
-
-func BenchmarkRealNotSharded4x(b *testing.B) {
-	benchmarkRealNotSharded(b, 4)
-}
-
-func BenchmarkRealSharded5x(b *testing.B) {
-	benchmarkRealSharded(b, 5)
-}
-
-func BenchmarkRealNotSharded5x(b *testing.B) {
-	benchmarkRealNotSharded(b, 5)
+func BenchmarkReal(b *testing.B) {
+	for _, multiplier := range []int{1, 2, 3, 4, 5} {
+		b.Run(fmt.Sprintf("Sharded%dX", multiplier), func(b *testing.B) {
+			benchmarkRealSharded(b, multiplier)
+		})
+		b.Run(fmt.Sprintf("NotSharded%dX", multiplier), func(b *testing.B) {
+			benchmarkRealNotSharded(b, multiplier)
+		})
+	}
 }

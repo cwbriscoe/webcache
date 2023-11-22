@@ -23,12 +23,22 @@ type Config struct {
 	Buckets  int   `json:"buckets"`
 }
 
+// validateBuckets validates the number of buckets in the config.
+// It returns the validated number of buckets.
+func validateBuckets(buckets int) int {
+	if buckets <= 0 || buckets > 256 {
+		return defaultBuckets
+	}
+	return buckets
+}
+
 // NewWebCache creates a new WebCache with a maximum size of capacity bytes.
 func NewWebCache(cfg *Config) *WebCache {
-	// buckets must be between 1 and 256
-	if cfg.Buckets <= 0 || cfg.Buckets > 256 {
-		cfg.Buckets = defaultBuckets
+	if cfg == nil {
+		return nil
 	}
+
+	cfg.Buckets = validateBuckets(cfg.Buckets)
 
 	webCache := &WebCache{
 		buckets: cfg.Buckets,
@@ -44,23 +54,25 @@ func NewWebCache(cfg *Config) *WebCache {
 	return webCache
 }
 
-// AddGroup adds a new cache group with a getter function
+// AddGroup adds a new cache group with a getter function.
+// A cache group is a set of cache entries that can be retrieved using the getter function.
 func (c *WebCache) AddGroup(group string, maxAge time.Duration, getter Getter) error {
+	var err error
 	for i := 0; i < c.buckets; i++ {
-		err := c.cache[i].AddGroup(group, maxAge, getter)
-		if err != nil {
-			return err
+		if addErr := c.cache[i].AddGroup(group, maxAge, getter); addErr != nil {
+			err = addErr
 		}
 	}
-	return nil
+	return err
 }
 
-// Delete the value indicated by the key, if it is present.
+// Delete removes the cache entry with the given key from the specified group, if it exists.
 func (c *WebCache) Delete(group string, key string) {
 	c.cache[c.getShard(key)].Delete(group, key)
 }
 
-// Get retrieves a value from the WebCache and returns value and etag
+// Get retrieves the cache entry with the given key from the specified group.
+// It returns the cached data and its associated CacheInfo, or an error if the entry does not exist.
 func (c *WebCache) Get(ctx context.Context, group, key, etag string) ([]byte, *CacheInfo, error) {
 	return c.cache[c.getShard(key)].Get(ctx, group, key, etag)
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -15,23 +16,28 @@ type Getter interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 }
 
+// call represents a concurrent function call
 type call struct {
 	sync.WaitGroup
-	err error
-	val []byte
+	err error  // err holds any error encountered during the function call
+	val []byte // val holds the result of the function call
 }
 
+// group represents a single group of cached values
 type group struct {
 	sync.Mutex
-	getter Getter
-	calls  map[string]*call
-	name   string
-	maxAge time.Duration
+	getter Getter           // getter is used to retrieve values for the cache
+	calls  map[string]*call // calls holds ongoing or completed function calls
+	name   string           // name is the name of the group
+	maxAge time.Duration    // maxAge is the maximum age of a cached value
 }
 
 func newGroup(name string, maxAge time.Duration, getter Getter) (*group, error) {
 	if getter == nil {
 		return nil, errors.New("getter must not be nil")
+	}
+	if name == "" {
+		return nil, errors.New("name must not be empty")
 	}
 
 	return &group{
@@ -60,10 +66,11 @@ func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error
 
 	// setup recovery in case the getter function panics.
 	defer func() {
-		if i := recover(); i != nil {
+		if r := recover(); r != nil {
+			stackTrace := debug.Stack()
 			call.val = []byte("")
 			call.err = fmt.Errorf(
-				"panic(recovered): (group:'%s',key:'%s') error:\n%v", g.name, key, i,
+				"panic(recovered): (group:'%s',key:'%s') error:\n%v\n%s", g.name, key, r, stackTrace,
 			)
 			err = call.err
 		}
@@ -74,10 +81,12 @@ func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error
 	return call.val, false, call.err
 }
 
+// finish removes a call from the calls map once it's done.
+// This prevents the map from growing indefinitely.
 func (g *group) finish(key string) {
 	g.Lock()
+	defer g.Unlock()
 	call := g.calls[key]
 	call.Done()
 	delete(g.calls, key)
-	g.Unlock()
 }
