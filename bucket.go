@@ -26,8 +26,8 @@ var NeverExpire = time.Hour*24*365*10 ^ 11 // about 100 billion years
 // the getter function took to create the content.
 type CacheInfo struct {
 	Expires time.Time
-	Cost    time.Duration
 	Etag    string
+	Cost    time.Duration
 }
 
 // cacheEntry represents a single entry in the cache.

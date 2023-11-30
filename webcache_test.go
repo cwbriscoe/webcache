@@ -30,6 +30,8 @@ func createWebCache(t *testing.T, config *Config) (CacheManager, error) {
 }
 
 func TestBucketCount(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		capacity int64
 		buckets  int
@@ -49,6 +51,8 @@ func TestBucketCount(t *testing.T) {
 }
 
 func TestSimpleSet(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	key := "key"
@@ -63,6 +67,8 @@ func TestSimpleSet(t *testing.T) {
 }
 
 func TestGroupSet(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestGroupSet"
@@ -78,6 +84,8 @@ func TestGroupSet(t *testing.T) {
 }
 
 func TestSimpleGetWrongKey(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	key := "key"
@@ -91,6 +99,8 @@ func TestSimpleGetWrongKey(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 400, Buckets: 1})
 	testy.Ok(t, err)
 	if cache.Stats().Capacity.Load() != 400 {
@@ -122,6 +132,8 @@ func TestTrim(t *testing.T) {
 }
 
 func TestTrimOverflow(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10, Buckets: 1})
 	testy.Ok(t, err)
 	key := "key"
@@ -138,6 +150,8 @@ func (*APITest1) Get(_ context.Context, key string) ([]byte, error) {
 }
 
 func TestGroupAdd(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestGroupGet"
@@ -155,6 +169,8 @@ func TestGroupAdd(t *testing.T) {
 }
 
 func TestGroupGet(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestGroupGet"
@@ -234,6 +250,8 @@ func (*PanicTest) Get(_ context.Context, _ string) ([]byte, error) {
 }
 
 func TestPanicInGetter(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestPanicInGetter"
@@ -259,6 +277,8 @@ func TestPanicInGetter(t *testing.T) {
 }
 
 func TestGroupGetWrongKey(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestGroupGetWrongKey"
@@ -275,6 +295,8 @@ func TestGroupGetWrongKey(t *testing.T) {
 }
 
 func TestSimpleDelete(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	key := "key"
@@ -289,6 +311,8 @@ func TestSimpleDelete(t *testing.T) {
 }
 
 func TestGroupDelete(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestGroupDelete"
@@ -307,6 +331,8 @@ func TestGroupDelete(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestStats"
@@ -364,6 +390,8 @@ func TestStats(t *testing.T) {
 }
 
 func TestExpires1(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestExpires1"
@@ -382,6 +410,8 @@ func TestExpires1(t *testing.T) {
 }
 
 func TestExpires2(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestExpires2"
@@ -403,6 +433,8 @@ func TestExpires2(t *testing.T) {
 }
 
 func TestExpiresEtag(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestExpiresEtag"
@@ -427,6 +459,8 @@ func TestExpiresEtag(t *testing.T) {
 var raceShardedCache = NewWebCache(&Config{Capacity: 10000, Buckets: 8})
 
 func TestRace(t *testing.T) {
+	t.Parallel()
+
 	var wg sync.WaitGroup
 
 	fn := func() {
@@ -463,6 +497,8 @@ func (*APIRaceTestCacheInfo) Get(_ context.Context, key string) ([]byte, error) 
 }
 
 func TestRaceCacheInfo(t *testing.T) {
+	t.Parallel()
+
 	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
 	testy.Ok(t, err)
 	grp := "TestRaceTestCacheInfo"
@@ -483,6 +519,45 @@ func TestRaceCacheInfo(t *testing.T) {
 
 	t.Run("RaceTestCacheInfo", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
+			t.Run(strconv.FormatInt(int64(i), 10), f1)
+		}
+	})
+}
+
+// TestRaceExpires will ensure that Get does not return a nil data or info
+// value when expires is set extrememly low and there are several concurrent
+// single flight requests
+
+type APITestRaceExpires struct{}
+
+func (*APITestRaceExpires) Get(_ context.Context, key string) ([]byte, error) {
+	time.Sleep(1 * time.Nanosecond)
+	return []byte("data"), nil
+}
+
+func TestRaceExpires(t *testing.T) {
+	t.Parallel()
+
+	cache, err := createWebCache(t, &Config{Capacity: 10000, Buckets: 8})
+	testy.Ok(t, err)
+	grp := "TestRaceExpires"
+	key := grp + "key"
+
+	a := &APITestRaceExpires{}
+	err = cache.AddGroup(grp, time.Nanosecond, a)
+	testy.Ok(t, err)
+
+	f1 := func(t *testing.T) {
+		t.Parallel()
+		data, info, err := cache.Get(context.TODO(), grp, key, "")
+		testy.Ok(t, err)
+		testy.NotNil(t, info)
+		testy.NotNil(t, data)
+		testy.Equals(t, string(data), "data")
+	}
+
+	t.Run("TestRaceExpires", func(t *testing.T) {
+		for i := 0; i < 10000; i++ {
 			t.Run(strconv.FormatInt(int64(i), 10), f1)
 		}
 	})

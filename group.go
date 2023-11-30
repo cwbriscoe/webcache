@@ -18,18 +18,18 @@ type Getter interface {
 
 // call represents a concurrent function call
 type call struct {
-	sync.WaitGroup
 	err error  // err holds any error encountered during the function call
 	val []byte // val holds the result of the function call
+	sync.WaitGroup
 }
 
 // group represents a single group of cached values
 type group struct {
-	sync.Mutex
 	getter Getter           // getter is used to retrieve values for the cache
 	calls  map[string]*call // calls holds ongoing or completed function calls
 	name   string           // name is the name of the group
 	maxAge time.Duration    // maxAge is the maximum age of a cached value
+	sync.Mutex
 }
 
 func newGroup(name string, maxAge time.Duration, getter Getter) (*group, error) {
