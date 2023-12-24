@@ -232,7 +232,7 @@ func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Durat
 	elem := c.list.PushFront(v)
 
 	// calculate the etag based of the hash sum of the data
-	hashstr := strconv.FormatUint(xxhash.Sum64(value), 16)
+	hashStr := strconv.FormatUint(xxhash.Sum64(value), 16)
 
 	// get the maxAge for the given group.  if no group is found then it never expires
 	maxAge := NeverExpire
@@ -245,7 +245,7 @@ func (c *Bucket) internalSet(group, key string, value []byte, elapsed time.Durat
 	ent := &cacheEntry{
 		elem: elem,
 		info: &CacheInfo{
-			Etag:    hashstr,
+			Etag:    hashStr,
 			Expires: time.Now().Add(maxAge),
 			Cost:    elapsed,
 		},
@@ -276,7 +276,7 @@ func (c *Bucket) Stats() *CacheStats {
 }
 
 // If the cache is over capacity, clear elements (starting at the end of the list) until it is back under
-// capacity. Note that this method is not threadsafe (it should only be called from other methods which
+// capacity. Note that this method is not thread safe (it should only be called from other methods which
 // already hold the lock).
 func (c *Bucket) trim() {
 	sz := c.stats.Size.Load()

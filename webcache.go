@@ -112,6 +112,6 @@ func (c *WebCache) BucketStats() []*CacheStats {
 
 func (c *WebCache) getShard(key string) uint64 {
 	hash := xxhash.New()
-	hash.Write([]byte(key))
+	_, _ = hash.Write([]byte(key))
 	return hash.Sum64() % uint64(c.buckets)
 }

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Getter defines an interface for retrieving emptty cache contents
+// Getter defines an interface for retrieving empty cache contents
 type Getter interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 }
@@ -48,7 +48,7 @@ func newGroup(name string, maxAge time.Duration, getter Getter) (*group, error) 
 	}, nil
 }
 
-// do ensures fn() is called only once per group key (singleflight).
+// do ensures fn() is called only once per group key (single-flight).
 func (g *group) do(ctx context.Context, key string) (_ []byte, _ bool, err error) {
 	g.Lock()
 

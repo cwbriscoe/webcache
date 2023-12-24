@@ -59,11 +59,11 @@ func TestSimpleSet(t *testing.T) {
 	val := "TestSimpleSet"
 
 	info1 := cache.Set("", key, []byte(val))
-	getval, info2, err := cache.Get(context.TODO(), "", key, "")
+	getVal, info2, err := cache.Get(context.TODO(), "", key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, info1.Etag, info2.Etag)
-	testy.Equals(t, val, string(getval))
+	testy.Equals(t, val, string(getVal))
 }
 
 func TestGroupSet(t *testing.T) {
@@ -76,11 +76,11 @@ func TestGroupSet(t *testing.T) {
 	val := key + "value"
 
 	info1 := cache.Set(grp, key, []byte(val))
-	getval, info2, err := cache.Get(context.TODO(), grp, key, "")
+	getVal, info2, err := cache.Get(context.TODO(), grp, key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, info1.Etag, info2.Etag)
-	testy.Equals(t, val, string(getval))
+	testy.Equals(t, val, string(getVal))
 }
 
 func TestSimpleGetWrongKey(t *testing.T) {
@@ -92,10 +92,10 @@ func TestSimpleGetWrongKey(t *testing.T) {
 	val := "value"
 
 	cache.Set("", key, []byte(val))
-	getval, _, err := cache.Get(context.TODO(), "", "notkey", "")
+	getVal, _, err := cache.Get(context.TODO(), "", "not key", "")
 
 	testy.Ok(t, err)
-	testy.Nil(t, getval)
+	testy.Nil(t, getVal)
 }
 
 func TestTrim(t *testing.T) {
@@ -137,7 +137,7 @@ func TestTrimOverflow(t *testing.T) {
 	cache, err := createWebCache(t, &Config{Capacity: 10, Buckets: 1})
 	testy.Ok(t, err)
 	key := "key"
-	val := "0123456789ABCDEF"
+	val := "0123456789"
 
 	cache.Set("", key, []byte(val))
 }
@@ -183,11 +183,11 @@ func TestGroupGet(t *testing.T) {
 	_, info1, err := cache.Get(context.TODO(), grp, key, "")
 	testy.Ok(t, err)
 
-	getval, info2, err := cache.Get(context.TODO(), grp, key, "")
+	getVal, info2, err := cache.Get(context.TODO(), grp, key, "")
 
 	testy.Ok(t, err)
 	testy.Equals(t, info1.Etag, info2.Etag)
-	testy.NotNil(t, getval)
+	testy.NotNil(t, getVal)
 }
 
 type APITest2 struct{}
@@ -286,12 +286,12 @@ func TestGroupGetWrongKey(t *testing.T) {
 	val := key + "value"
 
 	info1 := cache.Set(grp, key, []byte(val))
-	getval, info2, err := cache.Get(context.TODO(), grp, "notkey", "")
+	getVal, info2, err := cache.Get(context.TODO(), grp, "not key", "")
 
 	testy.Ok(t, err)
 	testy.Assert(t, info1 != nil, "expected info2 to not be nil")
 	testy.Assert(t, info2 == nil, "expected info2 to be nil")
-	testy.Nil(t, getval)
+	testy.Nil(t, getVal)
 }
 
 func TestSimpleDelete(t *testing.T) {
@@ -304,10 +304,10 @@ func TestSimpleDelete(t *testing.T) {
 
 	cache.Set("", key, []byte(val))
 	cache.Delete("", key)
-	getval, _, err := cache.Get(context.TODO(), "", key, "")
+	getVal, _, err := cache.Get(context.TODO(), "", key, "")
 
 	testy.Ok(t, err)
-	testy.Nil(t, getval)
+	testy.Nil(t, getVal)
 }
 
 func TestGroupDelete(t *testing.T) {
@@ -321,13 +321,13 @@ func TestGroupDelete(t *testing.T) {
 
 	cache.Set(grp, key, []byte(val))
 	cache.Delete(grp, key)
-	getval, info, err := cache.Get(context.TODO(), grp, key, "")
+	getVal, info, err := cache.Get(context.TODO(), grp, key, "")
 
 	t.Log(info)
 
 	testy.Ok(t, err)
 	testy.Assert(t, info == nil, "info should be nil")
-	testy.Nil(t, getval)
+	testy.Nil(t, getVal)
 }
 
 func TestStats(t *testing.T) {
@@ -464,7 +464,7 @@ func TestRace(t *testing.T) {
 	var wg sync.WaitGroup
 
 	fn := func() {
-		key := "somekey"
+		key := "some key"
 		v := []byte(strings.Repeat("X", 900))
 		for i := 0; i < 5000; i++ {
 			raceShardedCache.Set("", key, v)
@@ -525,12 +525,12 @@ func TestRaceCacheInfo(t *testing.T) {
 }
 
 // TestRaceExpires will ensure that Get does not return a nil data or info
-// value when expires is set extrememly low and there are several concurrent
+// value when expires is set extremely low and there are several concurrent
 // single flight requests
 
 type APITestRaceExpires struct{}
 
-func (*APITestRaceExpires) Get(_ context.Context, key string) ([]byte, error) {
+func (*APITestRaceExpires) Get(_ context.Context, _ string) ([]byte, error) {
 	time.Sleep(1 * time.Nanosecond)
 	return []byte("data"), nil
 }
@@ -582,8 +582,8 @@ func BenchmarkFnv(b *testing.B) {
 			hash := fnv.New64a()
 			_, _ = hash.Write(value)
 			sum := hash.Sum64()
-			hashstr := strconv.FormatUint(sum, 16)
-			if len(hashstr) == 0 {
+			hashStr := strconv.FormatUint(sum, 16)
+			if len(hashStr) == 0 {
 				b.Errorf("hashstring is zero")
 			}
 		}
@@ -597,10 +597,10 @@ func BenchmarkXXHash(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			hash := xxhash.New()
-			hash.Write(value)
+			_, _ = hash.Write(value)
 			sum := hash.Sum64()
-			hashstr := strconv.FormatUint(sum, 16)
-			if len(hashstr) == 0 {
+			hashStr := strconv.FormatUint(sum, 16)
+			if len(hashStr) == 0 {
 				b.Errorf("hashstring is zero")
 			}
 		}
@@ -613,9 +613,9 @@ func benchmarkRealSharded(b *testing.B, ratio int) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			keynum := rand.Intn(1000)
-			key := strconv.FormatUint(uint64(keynum), 10)
-			if keynum < 100*ratio {
+			keyNum := rand.Intn(1000)
+			key := strconv.FormatUint(uint64(keyNum), 10)
+			if keyNum < 100*ratio {
 				sz := rand.Intn(20000) + 1
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
@@ -632,9 +632,9 @@ func benchmarkRealNotSharded(b *testing.B, ratio int) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			keynum := rand.Intn(1000)
-			key := strconv.FormatUint(uint64(keynum), 10)
-			if keynum < 100*ratio {
+			keyNum := rand.Intn(1000)
+			key := strconv.FormatUint(uint64(keyNum), 10)
+			if keyNum < 100*ratio {
 				sz := rand.Intn(20000) + 1
 				val := []byte(strings.Repeat("X", sz))
 				cache.Set("", key, val)
@@ -674,8 +674,6 @@ func BenchmarkForCPUProfileWebCache(b *testing.B) {
 			random := rand.Intn(1000)
 			_, _, _ = cache.Get(context.TODO(), "group", keys[random], "")
 			// not necessary to add a call to Set() since Get calls it often
-			// random = rand.Intn(1000)
-			// cache.Delete("group", keys[random])
 		}
 	})
 }
